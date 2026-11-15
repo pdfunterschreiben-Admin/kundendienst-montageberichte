@@ -306,6 +306,15 @@ button.burger .ic{width:20px;height:20px}
 .ordner-liste button{border:0;border-radius:0;justify-content:flex-start;padding:7px 10px;border-bottom:1px solid var(--line);background:transparent;font-size:13.5px}
 .ordner-liste button:hover{background:var(--row)}
 .ordner-liste .hint{padding:12px}
+.arbeit{display:flex;flex-direction:column;gap:2px;padding-bottom:12px;border-bottom:1px solid var(--line);margin-bottom:2px}
+.mont.ansicht{font-weight:600}
+.mont .n.zahl.hat{background:var(--warn-soft);color:var(--warn)}
+#rueckfrageN.hat{background:var(--bad-soft);color:var(--bad)}
+.mont .n.ok{background:var(--ok-soft);color:var(--ok)}
+.mont.erledigt .name,.kw.erledigt > span:first-child{color:var(--muted)}
+.trenner{font-size:12px;color:var(--muted);padding:10px 8px 4px;border-top:1px solid var(--line);margin-top:6px}
+.kw .n.zahl{font:500 12px var(--f-body);border-radius:99px;padding:1px 8px}
+.kw .n.zahl.hat{background:var(--warn-soft);color:var(--warn)}
 @media (max-width:960px){body{height:auto;overflow:auto}.grid{grid-template-columns:minmax(0,1fr)}aside{border-right:0}.appbar{height:auto;flex-wrap:wrap;padding:10px 14px}}
 </style>
 </head>
@@ -321,6 +330,7 @@ button.burger .ic{width:20px;height:20px}
         <div class="m-teil m-knoepfe"><button type="button" class="m-zeile" id="checkBtn" hidden>Nach Updates suchen</button><button type="button" class="m-zeile" id="helpBtn">Anleitung</button></div>
         <div class="m-teil"><b>Ablage</b><p class="hint">Fertige PDFs liegen in</p><p class="pfad" id="ablagePfad">…</p>
         <p class="err" id="ablageFehlt" hidden></p><div class="row"><button type="button" id="ablageBtn"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 4.5v8a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-6a1 1 0 0 0-1-1H8L6.5 3.5h-4a1 1 0 0 0-1 1z"/></svg> Ordner öffnen</button><button type="button" id="ablageWahl">Ändern …</button></div></div>
+        <div class="m-teil"><b>Fertige Berichte fürs Büro</b><p class="hint">Abgezeichnete Aufträge werden zusätzlich hierhin kopiert (Auftragsnummer.pdf).</p><p class="pfad" id="fertigPfad">nicht eingestellt</p><p class="err" id="fertigFehlt" hidden></p><div class="row"><button type="button" id="fertigWahl">Ordner wählen …</button><button type="button" class="ghost danger" id="fertigAus" hidden>Ausschalten</button></div></div>
         <div class="m-teil"><b>Meine Unterschrift <span class="hint" id="sigStatus"></span></b><div class="crop-prev" id="sigAnzeige" style="width:100%"><span class="hint">Noch keine hinterlegt</span></div>
         <div class="row"><button type="button" id="sigAendern">Ändern</button><button type="button" class="ghost danger" id="sigLoeschen2" hidden>Löschen</button></div>
         <p class="hint">Gilt für neue Abzeichnungen. Schon abgezeichnete Aufträge behalten ihre Unterschrift.</p></div>
@@ -340,6 +350,10 @@ button.burger .ic{width:20px;height:20px}
   <div class="grid">
     <aside>
       <section class="panel" aria-labelledby="h-mont">
+        <div class="arbeit">
+          <button type="button" class="mont ansicht" id="zuPruefenBtn"><span class="name">Zu prüfen</span><span class="n zahl" id="zuPruefenN">–</span></button>
+          <button type="button" class="mont ansicht" id="rueckfrageBtn"><span class="name">Rückfrage offen</span><span class="n zahl" id="rueckfrageN">–</span></button>
+        </div>
         <div class="step"><h2 id="h-mont">Monteure</h2><button class="ghost" id="neuLaden" title="Liste neu laden" style="margin-left:auto"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9M13.5 2.5v3h-3"/></svg> Aktualisieren</button></div>
         <input type="search" id="montSuche" placeholder="Monteur suchen" aria-label="Monteur suchen" hidden>
         <div id="monteure" class="liste-mont"></div>
@@ -347,7 +361,15 @@ button.burger .ic{width:20px;height:20px}
       </section>
     </aside>
     <main>
-      <div class="doc">
+      <div class="doc" id="listeDoc" hidden>
+        <div class="doc-head"><div class="col" style="gap:2px"><span class="doc-name" id="listeTitel">Zu prüfen</span><span class="hint" id="listeInfo"></span></div></div>
+        <table>
+          <thead><tr><th>Monteur</th><th>KW</th><th>Auftrag</th><th>Berichte</th><th>Stand</th><th></th></tr></thead>
+          <tbody id="listeRows"></tbody>
+        </table>
+        <div class="empty" id="listeLeer" hidden><b>Alles erledigt</b><span>Es gibt nichts mehr zu prüfen.</span></div>
+      </div>
+      <div class="doc" id="wocheDoc">
         <div class="doc-head">
           <div class="col" style="gap:2px"><span class="doc-name" id="kwTitel">Bitte links einen Monteur und eine Kalenderwoche wählen</span><span class="hint" id="kwInfo"></span></div>
           <div class="row">
@@ -525,6 +547,7 @@ button.burger .ic{width:20px;height:20px}
 <script src="/signatur.js"></script>
 <script src="/pruefseite.js"></script>
 <script src="/gruppen.js"></script>
+<script src="/offen.js"></script>
 <script>
 (() => {
 const $ = s => document.querySelector(s);
@@ -598,7 +621,7 @@ async function vermerkSenden(ereignis, extra = {}){
   const r = await mbCall(ereignis, {monteur: w.email, jahr: w.jahr, kw: w.kw, auftrag: g.datei, ...extra});
   pruefSperren(false);
   if(!r.ok){ $("#pruefFehler").textContent = serverHinweis(r); $("#pruefFehler").hidden = false; return false; }
-  mb.vermerke[g.datei] = r.stand; pruefZeichnen(); renderWoche(); erstellen();
+  mb.vermerke[g.datei] = r.stand; uebStandSetzen(w, g, r.stand); pruefZeichnen(); renderWoche(); erstellen();
   return true;
 }
 async function abzeichnen(){
@@ -711,45 +734,111 @@ function unterschriftHinterlegen(){
   });
 }
 const kwText = k => `KW ${String(k.kw).padStart(2, "0")} / ${k.jahr}`;
-const KW_SICHTBAR = 6;
 function renderMonteure(){
   const box = $("#monteure"); box.innerHTML = "";
+  const st = mb.status;
+  $("#zuPruefenN").textContent = st ? st.zuPruefen.length : "–";
+  $("#rueckfrageN").textContent = st ? st.rueckfragen.length : "–";
+  $("#zuPruefenBtn").classList.toggle("auf", mb.ansicht === "pruefen");
+  $("#rueckfrageBtn").classList.toggle("auf", mb.ansicht === "rueckfrage");
+  $("#zuPruefenN").classList.toggle("hat", !!(st && st.zuPruefen.length));
+  $("#rueckfrageN").classList.toggle("hat", !!(st && st.rueckfragen.length));
   const such = $("#montSuche"); such.hidden = mb.monteure.length < 8;
   const q = such.hidden ? "" : such.value.trim().toLowerCase();
+  const info = m => (st && st.monteure[m.email]) || null;
+  const offenVon = m => { const i = info(m); return i ? i.offen : 0; };
   const liste = mb.monteure.filter(m => !q || m.name.toLowerCase().includes(q))
-    .sort((a, b) => a.name.localeCompare(b.name, "de"));
+    .sort((a, b) => (offenVon(b) > 0) - (offenVon(a) > 0) || a.name.localeCompare(b.name, "de"));
+  const heute = isoWoche(new Date());
+  let trennerDa = false;
   for(const m of liste){
-    const auf = mb.offen === m.email;
-    const b = document.createElement("button"); b.type = "button"; b.className = "mont" + (auf ? " auf" : "");
+    if(st && !q && !trennerDa && offenVon(m) === 0 && liste.some(x => offenVon(x) > 0)){
+      trennerDa = true;
+      const t = document.createElement("div"); t.className = "trenner"; t.textContent = "Alles abgezeichnet"; box.appendChild(t);
+    }
+    const auf = mb.offen === m.email, i = info(m);
+    const b = document.createElement("button"); b.type = "button"; b.className = "mont" + (auf ? " auf" : "") + (st && !offenVon(m) ? " erledigt" : "");
     b.setAttribute("aria-expanded", auf);
-    const summe = m.kws.reduce((s, k) => s + k.anzahl, 0);
-    b.innerHTML = `<span class="pfeil" aria-hidden="true"></span><span class="name">${esc(m.name)}</span><span class="n" title="Berichte insgesamt">${summe}</span>`;
-    b.onclick = () => { mb.offen = auf ? "" : m.email; mb.alleKw = false; renderMonteure(); };
+    const zahl = !st ? `<span class="n">${m.kws.reduce((s, k) => s + k.anzahl, 0)}</span>`
+      : i && i.offen ? `<span class="n zahl hat" title="Aufträge noch nicht abgezeichnet">${i.offen} offen</span>` : `<span class="n ok" title="Alles abgezeichnet">✓</span>`;
+    b.innerHTML = `<span class="pfeil" aria-hidden="true"></span><span class="name">${esc(m.name)}</span>${zahl}`;
+    b.onclick = () => { mb.offen = auf ? "" : m.email; mb.archiv = false; renderMonteure(); };
     box.appendChild(b);
     if(!auf) continue;
     const l = document.createElement("div"); l.className = "kws";
-    const kws = mb.alleKw ? m.kws : m.kws.slice(0, KW_SICHTBAR);
-    for(const k of kws){
+    const kwInfo = k => i ? i.kws[k.jahr + "|" + k.kw] : undefined;
+    const sicht = m.kws.filter(k => !imArchiv(k, kwInfo(k), heute)), archiv = m.kws.filter(k => imArchiv(k, kwInfo(k), heute));
+    const zeile = k => {
       const kb = document.createElement("button"); kb.type = "button";
       const gew = mb.wahl && mb.wahl.email === m.email && mb.wahl.jahr === k.jahr && mb.wahl.kw === k.kw;
-      kb.className = "kw" + (gew ? " gew" : "");
-      kb.innerHTML = `<span>${kwText(k)}</span><span class="hint">${k.anzahl} ${k.anzahl === 1 ? "Bericht" : "Berichte"}</span>`;
+      const ki = kwInfo(k);
+      kb.className = "kw" + (gew ? " gew" : "") + (ki && !ki.offen ? " erledigt" : "");
+      const stand = !ki ? `<span class="hint">${k.anzahl} ${k.anzahl === 1 ? "Bericht" : "Berichte"}</span>`
+        : ki.offen ? `<span class="n zahl hat">${ki.offen} offen</span>` : `<span class="hint">✓ ${ki.auftraege} ${ki.auftraege === 1 ? "Auftrag" : "Aufträge"}</span>`;
+      kb.innerHTML = `<span>${kwText(k)}</span>${stand}`;
       kb.onclick = () => kwOeffnen(m, k);
       l.appendChild(kb);
-    }
-    if(m.kws.length > KW_SICHTBAR){
+    };
+    sicht.forEach(zeile);
+    if(archiv.length){
       const mehr = document.createElement("button"); mehr.type = "button"; mehr.className = "link mehr";
-      mehr.textContent = mb.alleKw ? "Nur die letzten Wochen" : `Ältere Wochen anzeigen (${m.kws.length - KW_SICHTBAR})`;
-      mehr.onclick = () => { mb.alleKw = !mb.alleKw; renderMonteure(); };
+      mehr.textContent = mb.archiv ? "Archiv ausblenden" : `Archiv (${archiv.length} ${archiv.length === 1 ? "Woche" : "Wochen"})`;
+      mehr.onclick = () => { mb.archiv = !mb.archiv; renderMonteure(); };
       l.appendChild(mehr);
+      if(mb.archiv) archiv.forEach(zeile);
     }
     box.appendChild(l);
   }
   if(q && !liste.length) box.innerHTML = '<p class="hint">Kein Monteur gefunden.</p>';
 }
 $("#montSuche").oninput = renderMonteure;
+// ---- Prüfstand aller Monteure (Zu prüfen, Zahlen, Archiv) ----
+function isoWoche(d){ const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())); const tag = t.getUTCDay() || 7; t.setUTCDate(t.getUTCDate() + 4 - tag); const j = t.getUTCFullYear(); return {jahr: j, kw: Math.ceil(((t - Date.UTC(j, 0, 1)) / 86400000 + 1) / 7)}; }
+mb.ueb = null; mb.status = null; mb.ansicht = null; mb.archiv = false;
+async function uebersichtLaden(){
+  const r = await mbCall("mb_uebersicht");
+  mb.ueb = r.ok ? r : null;
+  mb.status = mb.ueb ? offenAuswerten(mb.ueb, gruppieren) : null;
+  if(mb.status && !mb.wahl && !mb.ansicht){ ansichtZeigen("pruefen"); return; }
+  renderMonteure(); if(mb.ansicht) renderListe();
+}
+function uebStandSetzen(w, g, st){
+  if(!mb.ueb) return;
+  mb.ueb.stand[w.email + "|" + w.jahr + "|" + w.kw + "|" + g.datei] = {abgezeichnet: !!st.abzeichnung, rueckfrage: !!(st.klaerung && st.klaerung.offen), korrekturen: st.korrekturen.length};
+  mb.status = offenAuswerten(mb.ueb, gruppieren); renderMonteure(); if(mb.ansicht) renderListe();
+}
+function ansichtZeigen(a){
+  mb.ansicht = a; $("#listeDoc").hidden = !a; $("#wocheDoc").hidden = !!a;
+  if(a){ mb.wahl = null; renderListe(); }
+  renderMonteure();
+}
+function renderListe(){
+  const s = mb.status, alle = !s ? [] : mb.ansicht === "rueckfrage" ? s.rueckfragen : s.zuPruefen;
+  $("#listeTitel").textContent = mb.ansicht === "rueckfrage" ? "Rückfrage offen" : "Zu prüfen";
+  $("#listeInfo").textContent = !s ? "Der Server liefert die Übersicht noch nicht (Server-Datei einspielen)." : `${alle.length} ${alle.length === 1 ? "Auftrag" : "Aufträge"} – die ältesten zuerst`;
+  const tb = $("#listeRows"); tb.innerHTML = "";
+  $("#listeLeer").hidden = !s || alle.length > 0;
+  const name = mail => (mb.monteure.find(m => m.email === mail) || {}).name || mail;
+  for(const x of alle){
+    const tr = document.createElement("tr"); tr.className = "klickbar"; tr.title = "PDF ansehen und prüfen";
+    const chips = (x.rueckfrage ? '<span class="chip bad">Rückfrage offen</span>' : "") + (x.korrekturen ? `<span class="chip warn">korrigiert (${x.korrekturen})</span>` : "");
+    tr.innerHTML = `<td>${esc(name(x.monteur))}</td><td class="ort">${esc(kwText(x))}</td><td class="nr">${x.nr ? esc(x.nr) : '<span class="hint">ohne Nummer</span>'}</td><td>${x.berichte}</td><td><div class="liste">${chips || '<span class="chip warn">offen</span>'}</div></td><td class="akt"><button type="button" class="primary">Prüfen</button></td>`;
+    tr.onclick = () => ausListeOeffnen(x);
+    tb.appendChild(tr);
+  }
+}
+async function ausListeOeffnen(x){
+  const m = mb.monteure.find(m => m.email === x.monteur); if(!m) return;
+  mb.offen = m.email; ansichtZeigen(null);
+  await kwOeffnen(m, {jahr: x.jahr, kw: x.kw});
+  const g = mb.gruppen.find(g => g.datei === x.auftrag);
+  if(g) pruefenOeffnen(g);
+}
+$("#zuPruefenBtn").onclick = () => ansichtZeigen("pruefen");
+$("#rueckfrageBtn").onclick = () => ansichtZeigen("rueckfrage");
 async function monteureLaden(){
   if(locked()) return;
+  uebersichtLaden();
   $("#monteureInfo").hidden = false; $("#monteureInfo").textContent = "Wird geladen …";
   const r = await mbCall("mb_monteure");
   if(!r.ok){ $("#monteureInfo").textContent = r.error || "Konnte nicht geladen werden."; $("#monteureInfo").className = "err"; return; }
@@ -759,6 +848,7 @@ async function monteureLaden(){
   $("#monteureInfo").hidden = !!mb.monteure.length;
   if(!mb.offen && mb.monteure.length === 1) mb.offen = mb.monteure[0].email;
   renderMonteure();
+  if(mb.ansicht) renderListe();
 }
 $("#neuLaden").onclick = () => { monteureLaden(); if(mb.wahl) kwOeffnen(mb.wahl.m, mb.wahl.k, false); };
 
@@ -792,6 +882,7 @@ $("#ablageBtn").onclick = async () => { const r = await (await fetch("/api/ablag
 $("#kwNeu").onclick = () => { if(!mb.wahl) return; for(const g of mb.gruppen){ try{ localStorage.removeItem(merkKey(mb.wahl, g)); }catch(e){} } erstellen(); };
 
 async function kwOeffnen(m, k, scroll = true){
+  if(mb.ansicht){ mb.ansicht = null; $("#listeDoc").hidden = true; $("#wocheDoc").hidden = false; }
   mb.wahl = {email: m.email, name: m.name, jahr: k.jahr, kw: k.kw, m, k};
   renderMonteure();
   $("#kwTitel").textContent = `${m.name} · ${kwText(k)}`;
@@ -862,6 +953,11 @@ async function erstellen(){
       const r = await (await fetch("/api/ablage", {method: "POST", headers: {"Content-Type": "application/json"},
         body: JSON.stringify({monteur: w.name, jahr: w.jahr, kw: w.kw, datei: g.datei, b64: b64(bytes)})})).json();
       if(!r.ok) throw new Error(r.error || "Speichern fehlgeschlagen.");
+      if(stand.abzeichnung){
+        const f = await (await fetch("/api/fertig", {method: "POST", headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({datei: g.datei, b64: b64(bytes)})})).json().catch(() => ({ok: false, error: "Keine Verbindung zum Programm."}));
+        if(!f.ok && !f.aus) throw new Error("Abgelegt, aber nicht in den Ordner für fertige Berichte: " + (f.error || ""));
+      }
       try{ localStorage.setItem(merkKey(w, g), wert); }catch(e){}
       neu++;
     }catch(e){ g.fehler = e.message || String(e); fehler++; }
@@ -1041,7 +1137,7 @@ $("#pqSetzen").onclick = async () => { if(await vermerkSenden("mb_klaerung", {ak
 $("#pqErledigt").onclick = () => vermerkSenden("mb_klaerung", {aktion: "erledigt"});
 $("#paSenden").onclick = abzeichnen;
 // ---- Ablageordner frei wählen ----
-let ordnerAkt = "";
+let ordnerAkt = "", ordnerZweck = "ablage";
 async function ablageAnzeigen(){
   const r = await (await fetch("/api/ablage/ordner")).json().catch(() => ({}));
   if(!r.ok) return;
@@ -1067,6 +1163,7 @@ async function ordnerZeigen(pfad){
   $("#ordnerHoch").onclick = () => ordnerZeigen(r.eltern);
 }
 async function ablageSetzen(pfad){
+  if(ordnerZweck === "fertig") return fertigSetzen(pfad);
   const r = await (await fetch("/api/ablage/ordner", {method: "PUT", headers: {"Content-Type": "application/json"}, body: JSON.stringify({pfad})})).json().catch(() => ({ok: false, error: "Keine Verbindung zum Programm."}));
   if(!r.ok){ $("#ordnerFehler").textContent = r.error; $("#ordnerFehler").hidden = false; return; }
   $("#ordnerDlg").close();
@@ -1075,8 +1172,35 @@ async function ablageSetzen(pfad){
   await ablageAnzeigen(); toast("Ablageordner: " + r.pfad, 6000);
   if(mb.wahl){ renderWoche(); erstellen(); }
 }
+async function fertigAnzeigen(){
+  const r = await (await fetch("/api/fertig/ordner")).json().catch(() => ({}));
+  if(!r.ok) return;
+  $("#fertigPfad").textContent = r.pfad || "nicht eingestellt";
+  $("#fertigAus").hidden = !r.pfad;
+  $("#fertigFehlt").hidden = !r.fehlt; $("#fertigFehlt").textContent = r.fehlt ? "Der Ordner ist gerade nicht erreichbar." : "";
+}
+async function fertigSetzen(pfad){
+  const r = await (await fetch("/api/fertig/ordner", {method: "PUT", headers: {"Content-Type": "application/json"}, body: JSON.stringify({pfad})})).json().catch(() => ({ok: false, error: "Keine Verbindung zum Programm."}));
+  if(!r.ok){ $("#ordnerFehler").textContent = r.error; $("#ordnerFehler").hidden = false; return; }
+  if($("#ordnerDlg").open) $("#ordnerDlg").close();
+  // Bereits abgezeichnete Aufträge der geöffneten Wochen werden beim nächsten Erstellen auch dorthin kopiert
+  try{ Object.keys(localStorage).filter(k => k.startsWith("mb|")).forEach(k => localStorage.removeItem(k)); }catch(e){}
+  await fertigAnzeigen(); toast(r.pfad ? "Fertige Berichte gehen nach: " + r.pfad : "Kopieren fertiger Berichte ausgeschaltet.", 6000);
+  if(r.pfad && mb.wahl){ renderWoche(); erstellen(); }
+}
+$("#fertigWahl").onclick = async () => {
+  menueZu(); ordnerZweck = "fertig"; $("#ordnerFehler").hidden = true;
+  $("#ordnerDlg").querySelector(".dlg-head strong").textContent = "Ordner für fertige Berichte wählen";
+  $("#ordnerStandard").textContent = "Ausschalten";
+  const r = await (await fetch("/api/fertig/ordner")).json().catch(() => ({}));
+  $("#ordnerDlg").showModal(); ordnerZeigen(r.ok && r.pfad ? r.pfad : "");
+};
+$("#fertigAus").onclick = () => { menueZu(); if(confirm("Abgezeichnete Berichte nicht mehr in den Ordner für fertige Berichte kopieren?")) fertigSetzen(""); };
+fertigAnzeigen();
 $("#ablageWahl").onclick = async () => {
-  menueZu(); $("#ordnerFehler").hidden = true;
+  menueZu(); ordnerZweck = "ablage"; $("#ordnerFehler").hidden = true;
+  $("#ordnerDlg").querySelector(".dlg-head strong").textContent = "Ablageordner wählen";
+  $("#ordnerStandard").textContent = "Standard verwenden";
   const r = await (await fetch("/api/ablage/ordner")).json().catch(() => ({}));
   $("#ordnerDlg").showModal(); ordnerZeigen(r.ok ? r.pfad : "");
 };
