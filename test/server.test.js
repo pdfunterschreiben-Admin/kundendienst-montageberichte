@@ -187,3 +187,14 @@ test('mbUebersicht: Stand je Auftrag in Kurzform (abgezeichnet, Rückfrage, Korr
   assert.deepEqual(r.stand['a@x|2026|45|1'], { abgezeichnet: true, rueckfrage: false, korrekturen: 1 });
   assert.deepEqual(r.stand['a@x|2026|45|2'], { abgezeichnet: false, rueckfrage: true, korrekturen: 0 });
 });
+
+test('mbOhneTestberichte: Berichte von Admin-Adressen (Testberichte) fallen für normale Nutzer weg', () => {
+  const zeilen = [
+    [0, 'Anna', 'anna@firma.de'],
+    [0, 'Admin', 'B.Stockey@Schlueter-Gabelstapler.de'],
+    [0, 'Bob', 'bob@firma.de'],
+  ];
+  const admins = ['b.stockey@hotmail.de', 'b.stockey@schlueter-gabelstapler.de'];
+  assert.deepEqual(s.mbOhneTestberichte(zeilen, admins).map(r => r[1]), ['Anna', 'Bob']);
+  assert.equal(s.mbOhneTestberichte([], admins).length, 0);
+});
