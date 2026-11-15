@@ -315,6 +315,14 @@ button.burger .ic{width:20px;height:20px}
 .trenner{font-size:12px;color:var(--muted);padding:10px 8px 4px;border-top:1px solid var(--line);margin-top:6px}
 .kw .n.zahl{font:500 12px var(--f-body);border-radius:99px;padding:1px 8px}
 .kw .n.zahl.hat{background:var(--warn-soft);color:var(--warn)}
+.m-fach{padding:0 14px}
+.m-fach > summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:8px;font-weight:600;font-size:13px;padding:12px 0}
+.m-fach > summary::-webkit-details-marker{display:none}
+.m-fach > summary::after{content:"";margin-left:auto;width:7px;height:7px;border-right:1.5px solid var(--muted);border-bottom:1.5px solid var(--muted);transform:rotate(45deg);transition:transform .12s}
+.m-fach[open] > summary::after{transform:rotate(-135deg)}
+.m-fach > summary .hint{font-weight:400}
+.m-fach[open]{padding-bottom:12px}
+.m-fach > :not(summary){margin:0 0 8px}
 @media (max-width:960px){body{height:auto;overflow:auto}.grid{grid-template-columns:minmax(0,1fr)}aside{border-right:0}.appbar{height:auto;flex-wrap:wrap;padding:10px 14px}}
 </style>
 </head>
@@ -328,14 +336,14 @@ button.burger .ic{width:20px;height:20px}
       <div class="menue-panel" id="menue" hidden>
         <div class="m-teil"><p class="nutzer" id="userLine" hidden></p><span class="ver" id="verText">Version …</span></div>
         <div class="m-teil m-knoepfe"><button type="button" class="m-zeile" id="checkBtn" hidden>Nach Updates suchen</button><button type="button" class="m-zeile" id="helpBtn">Anleitung</button></div>
-        <div class="m-teil"><b>Ablage</b><p class="hint">Fertige PDFs liegen in</p><p class="pfad" id="ablagePfad">…</p>
-        <p class="err" id="ablageFehlt" hidden></p><div class="row"><button type="button" id="ablageBtn"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 4.5v8a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-6a1 1 0 0 0-1-1H8L6.5 3.5h-4a1 1 0 0 0-1 1z"/></svg> Ordner öffnen</button><button type="button" id="ablageWahl">Ändern …</button></div></div>
-        <div class="m-teil"><b>Fertige Berichte fürs Büro</b><p class="hint">Abgezeichnete Aufträge werden zusätzlich hierhin kopiert (Auftragsnummer.pdf). Nichts wird überschrieben: eine neue Fassung heißt „Nr (2).pdf“.</p><p class="pfad" id="fertigPfad">nicht eingestellt</p><p class="err" id="fertigFehlt" hidden></p><div class="row"><button type="button" id="fertigWahl">Ordner wählen …</button><button type="button" class="ghost danger" id="fertigAus" hidden>Ausschalten</button></div></div>
-        <div class="m-teil"><b>Meine Unterschrift <span class="hint" id="sigStatus"></span></b><div class="crop-prev" id="sigAnzeige" style="width:100%"><span class="hint">Noch keine hinterlegt</span></div>
+        <details class="m-teil m-fach"><summary>Ablage</summary><p class="hint">Fertige PDFs liegen in</p><p class="pfad" id="ablagePfad">…</p>
+        <p class="err" id="ablageFehlt" hidden></p><div class="row"><button type="button" id="ablageBtn"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 4.5v8a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-6a1 1 0 0 0-1-1H8L6.5 3.5h-4a1 1 0 0 0-1 1z"/></svg> Ordner öffnen</button><button type="button" id="ablageWahl">Ändern …</button></div></details>
+        <details class="m-teil m-fach"><summary>Fertige Berichte fürs Büro <span class="hint" id="fertigStatus"></span></summary><p class="hint">Abgezeichnete Aufträge werden zusätzlich hierhin kopiert (Auftragsnummer.pdf). Nichts wird überschrieben: eine neue Fassung heißt „Nr (2).pdf“.</p><p class="pfad" id="fertigPfad">nicht eingestellt</p><p class="err" id="fertigFehlt" hidden></p><div class="row"><button type="button" id="fertigWahl">Ordner wählen …</button><button type="button" class="ghost danger" id="fertigAus" hidden>Ausschalten</button></div></details>
+        <details class="m-teil m-fach"><summary>Meine Unterschrift <span class="hint" id="sigStatus"></span></summary><div class="crop-prev" id="sigAnzeige" style="width:100%"><span class="hint">Noch keine hinterlegt</span></div>
         <div class="row"><button type="button" id="sigAendern">Ändern</button><button type="button" class="ghost danger" id="sigLoeschen2" hidden>Löschen</button></div>
-        <p class="hint">Gilt für neue Abzeichnungen. Schon abgezeichnete Aufträge behalten ihre Unterschrift.</p></div>
-        <div class="m-teil" id="adminPanel" hidden><b>Testkanal <span class="chip info">Admin</span></b><label class="check"><input type="checkbox" id="testChannel"> Testversionen vor allen anderen bekommen</label>
-        <p class="hint">Wer die Montageberichte sehen darf: <button class="link" id="openSheet">Google-Tabelle öffnen</button> → Blatt „Nutzer Montageberichte“, Spalte „Berechtigt (ja)“.</p></div>
+        <p class="hint">Gilt für neue Abzeichnungen. Schon abgezeichnete Aufträge behalten ihre Unterschrift.</p></details>
+        <details class="m-teil m-fach" id="adminPanel" hidden><summary>Testkanal <span class="chip info">Admin</span></summary><label class="check"><input type="checkbox" id="testChannel"> Testversionen vor allen anderen bekommen</label>
+        <p class="hint">Wer die Montageberichte sehen darf: <button class="link" id="openSheet">Google-Tabelle öffnen</button> → Blatt „Nutzer Montageberichte“, Spalte „Berechtigt (ja)“.</p></details>
       </div>
     </div>
   </div>
@@ -393,15 +401,36 @@ button.burger .ic{width:20px;height:20px}
     <div class="dlg-head"><strong>Anleitung</strong><button class="ghost" value="x">Schließen</button></div>
     <div class="dlg-body help">
       <h3>Woher kommen die Berichte?</h3>
-      <p>Der Monteur klickt in der Service-Mappe bei „Berichte unterschreiben“ auf „📤 An Kundendienst senden“ – dann landen seine unterschriebenen Berichte hier. Freigegeben wird das je Monteur in der Google-Tabelle, Blatt „Nutzer“, Spalte „An Kundendienst senden (ja)“. Die Kalenderwoche richtet sich nach dem Datum im Bericht.</p>
+      <p>Der Monteur klickt in der Service-Mappe bei „Berichte unterschreiben“ auf „An Kundendienst senden“ – dann landen seine unterschriebenen Berichte hier. Freigegeben wird das je Monteur in der Google-Tabelle, Blatt „Nutzer“, Spalte „An Kundendienst senden (ja)“. Wer die Montageberichte hier sehen darf, steht im Blatt „Nutzer Montageberichte“, Spalte „Berechtigt (ja)“. Die Kalenderwoche richtet sich nach dem Datum im Bericht.</p>
+      <h3>Was ist zu tun? – „Zu prüfen“</h3>
+      <ul>
+        <li>Oben links steht <b>Zu prüfen</b> mit der Zahl aller Aufträge, die noch nicht abgezeichnet sind – von allen Monteuren, die ältesten zuerst. Einfach von oben nach unten abarbeiten.</li>
+        <li><b>Rückfrage offen</b> zeigt die Aufträge, bei denen noch etwas geklärt werden muss.</li>
+        <li>Bei jedem Monteur und jeder Kalenderwoche steht, wie viele Aufträge noch <b>offen</b> sind, oder ein Haken, wenn alles abgezeichnet ist. Monteure mit Offenem stehen oben.</li>
+        <li>Wochen, die ganz abgezeichnet und mindestens 4 Wochen alt sind, liegen im <b>Archiv</b> (unter den Wochen des Monteurs aufklappen).</li>
+      </ul>
       <h3>Monteur und Kalenderwoche</h3>
       <ul>
-        <li>Links auf einen <b>Monteur</b> klicken – darunter stehen seine Kalenderwochen (die neueste oben).</li>
-        <li>Eine <b>Kalenderwoche</b> anklicken: Die Berichte werden nach <b>Auftragsnummer</b> sortiert und je Auftrag zu einer PDF zusammengefügt – erst der Montagebericht, dann der UVV-Bericht, dann der DGUV-V3-Bericht.</li>
-        <li>UVV- und DGUV-Berichte ohne Auftragsnummer werden über die <b>Seriennummer</b> dem passenden Montagebericht zugeordnet.</li>
+        <li>Einen <b>Monteur</b> anklicken – darunter stehen seine Kalenderwochen (die neueste oben). Bei vielen Monteuren hilft das Suchfeld.</li>
+        <li>Eine <b>Kalenderwoche</b> anklicken: Die Berichte werden je <b>Auftragsnummer</b> zu einer PDF zusammengefügt – erst der Montagebericht, dann der UVV-Bericht, dann der DGUV-V3-Bericht.</li>
+        <li>UVV- und DGUV-Berichte ohne Auftragsnummer werden über die <b>Seriennummer</b> dem passenden Auftrag zugeordnet.</li>
       </ul>
-      <h3>Ablage</h3>
-      <p>Die PDFs werden automatisch gespeichert unter <b>Dokumente\Kundendienst Montageberichte\&lt;Monteur&gt;\&lt;Jahr&gt; KW &lt;Nummer&gt;\&lt;Auftragsnummer&gt;.pdf</b>. Kommen später noch Berichte zu einem Auftrag dazu, wird die PDF beim nächsten Öffnen der Woche neu erstellt.</p>
+      <h3>Prüfen und abzeichnen</h3>
+      <ul>
+        <li>Auf einen Auftrag klicken (oder „Prüfen“): Links steht die PDF, rechts wird geprüft. Das Fenster lässt sich an der Ecke unten rechts größer ziehen, oben rechts maximieren oder minimieren.</li>
+        <li><b>Korrektur eintragen:</b> Bereich wählen (Text, Ersatzteile, Arbeitszeit, Sonstiges), eintragen, was im Bericht steht und was richtig ist. Name und Zeit werden mit gespeichert.</li>
+        <li><b>Rückfrage setzen</b>, wenn etwas unklar ist; später „Als geklärt markieren“. Solange eine Rückfrage offen ist, kann nicht abgezeichnet werden.</li>
+        <li><b>Kontrolliert – abzeichnen:</b> Die PDF bekommt hinten die Seite „Korrekturen und Prüfung“ mit deiner Unterschrift. Eine spätere Korrektur oder neue Rückfrage hebt die Abzeichnung wieder auf.</li>
+      </ul>
+      <h3>Unterschrift</h3>
+      <p>Beim ersten Abzeichnen erscheint ein QR-Code: mit dem Handy scannen, ein Blatt mit deiner Unterschrift fotografieren (z. B. einen unterschriebenen Bericht) und am Computer einen Rahmen um die Unterschrift ziehen. Alternativ mit der Maus zeichnen. Ändern oder löschen: Menü ☰ → „Meine Unterschrift“.</p>
+      <h3>Ablage und fertige Berichte</h3>
+      <ul>
+        <li>Jede PDF wird automatisch gespeichert unter <b>&lt;Ablageordner&gt;\&lt;Monteur&gt;\&lt;Jahr&gt; KW &lt;Nummer&gt;\&lt;Auftragsnummer&gt;.pdf</b>. Der Ablageordner ist frei wählbar: Menü ☰ → „Ablage“ → „Ändern …“ (Standard: Dokumente\Kundendienst Montageberichte).</li>
+        <li><b>Fertige Berichte fürs Büro:</b> Ist dafür ein Ordner gewählt (Menü ☰), wird jeder abgezeichnete Auftrag zusätzlich dorthin kopiert – als &lt;Auftragsnummer&gt;.pdf. Dort wird nie überschrieben: eine neue Fassung heißt „&lt;Nr&gt; (2).pdf“.</li>
+      </ul>
+      <h3>Menü ☰ oben rechts</h3>
+      <p>Anmeldung ändern oder abmelden, Version und Updates, diese Anleitung, Ablage, Ordner für fertige Berichte, Unterschrift und (für Admins) Testkanal.</p>
     </div>
   </form>
 </dialog>
@@ -1180,6 +1209,7 @@ async function fertigAnzeigen(){
   if(!r.ok) return;
   $("#fertigPfad").textContent = r.pfad || "nicht eingestellt";
   $("#fertigAus").hidden = !r.pfad;
+  $("#fertigStatus").textContent = r.pfad ? (r.fehlt ? "nicht erreichbar" : "an") : "aus";
   $("#fertigFehlt").hidden = !r.fehlt; $("#fertigFehlt").textContent = r.fehlt ? "Der Ordner ist gerade nicht erreichbar." : "";
 }
 async function fertigSetzen(pfad){
