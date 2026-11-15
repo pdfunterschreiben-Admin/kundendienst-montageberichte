@@ -116,6 +116,7 @@ func (a *app) routes() http.Handler {
 	mux.HandleFunc("/api/report", a.handleReport)
 	mux.HandleFunc("/lib/pdf-lib.min.js", a.handlePdfLib)
 	mux.HandleFunc("/api/mb", a.handleMb)
+	mux.HandleFunc("/api/unterschrift", a.handleUnterschrift)
 	mux.HandleFunc("/api/ablage", a.handleAblage)
 	mux.HandleFunc("/api/ablage/zeigen", a.handleAblageZeigen)
 	mux.HandleFunc("/api/open", func(w http.ResponseWriter, r *http.Request) {
