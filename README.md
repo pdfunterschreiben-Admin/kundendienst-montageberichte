@@ -18,6 +18,10 @@ Die Kalenderwoche richtet sich nach dem Datum im Bericht (ISO-Woche).
 Jeder, der sich im Programm mit Namen und E-Mail anmeldet, darf die Berichte sehen (das Programm ist nur für
 die Dispo gedacht). Sperren: im Blatt „Nutzer Montageberichte“ in der Spalte „Gesperrt (ja)“ ein `ja` eintragen.
 
+**Testkonto:** Berichte, deren Monteur-Adresse das Testkonto ist (`MB_TEST_MAILS` im Server, benjaminstockey@gmail.com),
+sieht nur das Testkonto. So bleiben Testberichte aus der Service-Mappe für alle anderen unsichtbar. Die Testversion bekommt
+ebenfalls nur dieses Konto. Programmänderungen bekommen alle anderen erst mit einer fertigen Version (`VERSION`).
+
 ## Korrekturen und Abzeichnen
 Zu jedem Auftrag gibt es „✎ Prüfen“: Fehler in Text, Ersatzteilen oder Arbeitszeit werden als Korrektur
 eingetragen (Name und Zeit werden mitgespeichert), Unklarheiten als Rückfrage markiert und später als

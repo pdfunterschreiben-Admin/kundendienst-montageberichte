@@ -1003,7 +1003,7 @@ async function erstellen(){
 
 /* ---------- Updates ---------- */
 // Admins bekommen auf Wunsch Testversionen, bevor sie für alle freigegeben werden.
-const ADMINS = ["b.stockey@hotmail.de", "b.stockey@schlueter-gabelstapler.de"];
+const ADMINS = ["benjaminstockey@gmail.com"]; // nur dieses Konto bekommt die Testversion
 const isAdmin = () => !!(state.user && state.user.verified && ADMINS.includes(state.user.email)
   && state.user.name.trim().toLowerCase() === "benjamin stockey");
 const kanal = () => (isAdmin() && state.testChannel !== false) ? "?kanal=test" : "";
@@ -1063,7 +1063,7 @@ const locked = () => reportOn && (!state.user || !state.user.verified || state.b
 let mailEdited = false;
 $("#regName").addEventListener("input", () => { if(!mailEdited) $("#regMail").value = mailFromName($("#regName").value); });
 // Eine vollständige Adresse (mit @) ist nur für Admins erlaubt – sonst wird die Firmen-Domain angehängt.
-const ADMIN_MAILS = ["b.stockey@hotmail.de"];
+const ADMIN_MAILS = ["b.stockey@hotmail.de", "benjaminstockey@gmail.com"];
 $("#regMail").addEventListener("input", () => {
   mailEdited = true;
   const v = $("#regMail").value.trim().toLowerCase();
