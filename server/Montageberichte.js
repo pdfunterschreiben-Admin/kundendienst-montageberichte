@@ -150,4 +150,52 @@ function montageberichteAnfrage(d) {
   return { ok: false, error: 'Unbekannte Anfrage.' };
 }
 
-if (typeof module !== 'undefined') module.exports = { mbKw, mbDatum };
+// ---------------- Korrekturen, Rückfragen und Abzeichnung ----------------
+// Der Verlauf liegt im Blatt „Korrekturen Montageberichte“ (nur anhängen). Der Stand eines Auftrags wird daraus berechnet.
+const MB_BEREICHE = ['Text', 'Ersatzteile', 'Arbeitszeit', 'Sonstiges'];
+
+// ereignisse: [{t, ereignis, bereich, vorher, nachher, text, name, mail, unterschriftId}] in Zeilenreihenfolge
+function mbStand(ereignisse) {
+  const korrekturen = [];
+  let klaerung = null, abzeichnung = null;
+  ereignisse.forEach(function (e) {
+    if (e.ereignis === 'korrektur') {
+      korrekturen.push({ t: e.t, bereich: e.bereich, vorher: e.vorher, nachher: e.nachher, name: e.name });
+      abzeichnung = null;
+    } else if (e.ereignis === 'klaerung_setzen') {
+      klaerung = { offen: true, text: e.text, name: e.name, t: e.t };
+      abzeichnung = null;
+    } else if (e.ereignis === 'klaerung_erledigt') {
+      klaerung = { offen: false, text: klaerung ? klaerung.text : '', name: e.name, t: e.t };
+    } else if (e.ereignis === 'abzeichnung') {
+      abzeichnung = { name: e.name, t: e.t, unterschriftId: e.unterschriftId };
+    }
+  });
+  const letzte = ereignisse.length ? ereignisse[ereignisse.length - 1].t : 0;
+  return { korrekturen: korrekturen, klaerung: klaerung, abzeichnung: abzeichnung, schluessel: ereignisse.length + ':' + letzte };
+}
+
+// Gibt den Fehlertext zurück oder null, wenn das Ereignis eingetragen werden darf.
+function mbVermerkPruefen(ereignis, daten, stand) {
+  const txt = function (v) { return String(v == null ? '' : v).trim(); };
+  if (ereignis === 'korrektur') {
+    if (MB_BEREICHE.indexOf(daten.bereich) < 0) return 'Unbekannter Bereich.';
+    if (!txt(daten.nachher)) return 'Bitte angeben, was richtig ist.';
+    if (txt(daten.vorher).length > 500 || txt(daten.nachher).length > 500 || txt(daten.text).length > 1000) return 'Text zu lang.';
+    return null;
+  }
+  if (ereignis === 'klaerung_setzen') {
+    if (!txt(daten.text)) return 'Bitte die Rückfrage beschreiben.';
+    if (txt(daten.text).length > 1000) return 'Text zu lang.';
+    return null;
+  }
+  if (ereignis === 'klaerung_erledigt') return stand.klaerung && stand.klaerung.offen ? null : 'Es ist keine Rückfrage offen.';
+  if (ereignis === 'abzeichnung') {
+    if (stand.klaerung && stand.klaerung.offen) return 'Rückfrage noch offen – erst als geklärt markieren.';
+    if (stand.abzeichnung) return 'Schon abgezeichnet.';
+    return null;
+  }
+  return 'Unbekannte Anfrage.';
+}
+
+if (typeof module !== 'undefined') module.exports = { mbKw, mbDatum, MB_BEREICHE, mbStand, mbVermerkPruefen };
