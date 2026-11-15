@@ -33,7 +33,8 @@ Korrigiert wird in diesen Fällen (so von Benjamin genannt):
 ## Anti-Ziele (wäre ein Fehlschlag, auch wenn es technisch läuft)
 - Eine Korrektur ohne Namen oder ohne Zeitpunkt.
 - Vermerke, die beim Neu-Erstellen, am anderen PC oder nach einem Update verschwinden.
-- Eine Unterschrift, die auf dem Server oder bei anderen Nutzern liegt.
+- Eine Unterschrift, die dauerhaft auf dem Server liegt oder bei anderen Nutzern sichtbar ist. Nur die kurze
+  Zwischenablage beim Hochladen vom Handy ist erlaubt (siehe „Unterschrift per Handy“).
 - Ein Bericht, der abgezeichnet aussieht, obwohl danach noch etwas korrigiert wurde.
 
 ## Constraints
@@ -53,6 +54,9 @@ Korrigiert wird in diesen Fällen (so von Benjamin genannt):
 - **C. Nur lokal in der PDF (verworfen).** Vermerke gingen beim Neu-Erstellen oder am zweiten PC verloren.
 - Rückfrage: nur Markierung mit Text (gewählt). Mail an den Monteur und Antwort im Programm sind spätere Schritte.
 - Unterschrift: einmal im Programm hinterlegen, beim Abzeichnen einfügen (so von Benjamin bestätigt).
+  Hinterlegt wird sie per **QR-Code und Handy**: Das Programm zeigt einen QR-Code, das Handy fotografiert die
+  Unterschrift auf einem Blatt Papier (so von Benjamin gewünscht). Ein Zeichenfeld mit Maus oder Stift bleibt als
+  Ersatz.
 
 ## Die Entscheidungen im Einzelnen
 
@@ -65,7 +69,8 @@ Korrigiert wird in diesen Fällen (so von Benjamin genannt):
   2. **Rückfrage:** Textfeld und Knopf „Rückfrage setzen“. Ist eine offen, steht sie da mit Name und Datum und
      einem Knopf „Als geklärt markieren“.
   3. **Abzeichnen:** Knopf „Kontrolliert – abzeichnen“. Gibt es noch keine Unterschrift, öffnet sich zuerst ein
-     Feld zum Unterschreiben mit Maus oder Stift.
+     Fenster „Unterschrift hinterlegen“ mit einem QR-Code (Ablauf siehe „Unterschrift per Handy“) und dem
+     Ersatz „Stattdessen hier zeichnen“ (Maus oder Stift).
 - Die Unterschrift lässt sich im Fenster später ändern.
 
 ### Prüfseite in der PDF
@@ -101,7 +106,7 @@ Korrigiert wird in diesen Fällen (so von Benjamin genannt):
 
 ### Programm (Go)
 - Neue Schnittstelle `/api/unterschrift`: Unterschrift als PNG lesen und speichern, in `dataDir()` je Windows-Benutzer
-  (`unterschrift.png`). Sie wird nie an den Server geschickt.
+  (`unterschrift.png`). Dauerhaft liegt sie nur dort. Der Server bekommt sie nur kurz beim Hochladen vom Handy.
 - Die neuen Server-Anfragen laufen über `handleMb`: Dort kommen die vier neuen Ereignisse in die Liste der
   erlaubten Anfragen und die Felder (Bereich, Vorher, Nachher, Text, Auftrag) in die Anfrage.
 - Ist der Server noch nicht aktualisiert, antwortet er „Unbekannte Anfrage“. Das Programm zeigt dann einen klaren
@@ -110,12 +115,36 @@ Korrigiert wird in diesen Fällen (so von Benjamin genannt):
 ### Version
 - Herausgabe nur als Testversion (`TESTVERSION` höher, z. B. 1.1.0). `VERSION` bleibt unverändert, bis Benjamin es sagt.
 
+### Unterschrift per Handy
+QR-Codes lesen iPhone und Android gleich mit der normalen Kamera-App, ohne dass eine App nötig ist.
+Das Handy kommt aber nicht an das Programm auf dem PC heran, deshalb läuft es über den Server (Apps Script):
+1. Das Programm fragt beim Server einen **einmaligen Code** an (zufällig, mindestens 24 Zeichen, gilt 10 Minuten,
+   gehört zum angemeldeten Nutzer) und zeigt den Link mit dem Code als QR-Code. Dafür braucht das Programm eine
+   QR-Erzeugung (Bibliothek im Programm oder im Browserteil). Die Wahl trifft der Baumeister, sie muss ohne
+   Internet am PC funktionieren oder wie pdf-lib beim ersten Start geladen und zwischengespeichert werden.
+2. Das Handy öffnet den Link. Die kleine Seite (vom Server ausgeliefert) bietet „Unterschrift fotografieren“
+   (Kamera des Handys, `capture`), zeigt das Foto zur Kontrolle und schickt es hoch. Ohne Anmeldung am Handy,
+   der Code allein reicht, und er gilt nur einmal.
+3. Der Server legt das Foto **nur bis zum Abholen, höchstens 10 Minuten** ab.
+4. Das Programm fragt alle paar Sekunden nach, holt das Foto ab, schneidet den Rand zu, macht den weißen Papierhintergrund
+   durchsichtig und zeigt die Vorschau. Erst nach „Übernehmen“ wird es als `unterschrift.png` lokal gespeichert.
+5. Der Server löscht das Foto sofort nach dem Abholen, sonst nach 10 Minuten, und gibt den Code nie ein zweites Mal frei.
+- Neue Server-Ereignisse dafür: `unterschrift_code` (Büro-Programm), `unterschrift_abholen` (Büro-Programm),
+  `unterschrift_hochladen` (Handy-Seite, ohne Anmeldung, nur mit gültigem Code).
+- **Meine Entscheidung:** Ablage zwischendurch im Skript-Cache bzw. in den Skript-Eigenschaften des Apps-Script-Projekts,
+  nicht in Google Drive, damit nichts als Datei liegen bleibt. Das Foto wird vor dem Hochladen am Handy auf
+  etwa 1000 Pixel Breite verkleinert.
+- **Offen für den Baumeister (im Code nicht zu sehen):** Liefert das Apps-Script-Projekt „PDF Unterschreiben Anmeldung“
+  schon Seiten per `doGet` aus, und ist die Web-App für „Jeden“ erreichbar? Davon hängt ab, wie die Handy-Seite
+  eingebunden wird. Diese Datei im Repository enthält nur `server/Montageberichte.js`, nicht das übrige Projekt.
+
 ## Was bewusst offen bleibt
 - Genaue Gestaltung (Abstände, Farben, Größe der Prüfseite) entscheidet der Baumeister im Stil des bestehenden Programms.
 - Texte der Schaltflächen und Hinweise: wie oben vorgeschlagen, kleine Änderungen sind in Ordnung.
 
 ## Was sich hier nicht prüfen lässt (ehrlich vorab)
-- Die Windows-Oberfläche und das Zeichnen der Unterschrift lassen sich in dieser Umgebung nicht ausprobieren.
+- Die Windows-Oberfläche, das Zeichnen der Unterschrift und der Weg über Handy-Kamera und QR-Code lassen sich in
+  dieser Umgebung nicht ausprobieren. Das Handy und der Apps-Script-Teil müssen von Benjamin getestet werden.
 - Prüfbar sind: die Berechnung des Stands aus dem Verlauf (Test mit Node), die Go-Teile (Bauen, `go vet`) und,
   soweit pdf-lib verfügbar ist, das Erzeugen der Prüfseite.
 - Das Einspielen von `server/Montageberichte.js` ins Apps-Script-Projekt muss Benjamin selbst machen.
