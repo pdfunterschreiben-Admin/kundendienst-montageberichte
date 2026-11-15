@@ -22,7 +22,7 @@
 - Herausgabe nur über `TESTVERSION` (auf `1.1.0`). `VERSION` bleibt `1.0.1`.
 - Die Server-Datei darf nur Funktionen und Konstanten enthalten, die in Apps Script laufen (kein `import`); die letzte Zeile `module.exports` bleibt für die Tests.
 - Commit-Nachrichten enden mit den Zeilen `Co-Authored-By` und `Claude-Session` wie in den bisherigen Commits.
-- Tests: `node --test test/` (Prüfseite braucht pdf-lib: `NODE_PATH=/opt/npm-tools/node_modules node --test test/`), `go test ./...`, `go vet ./...`.
+- Tests: `node --test "test/*.test.js"` (Prüfseite braucht pdf-lib: `NODE_PATH=/opt/npm-tools/node_modules node --test "test/*.test.js"`), `go test ./...`, `go vet ./...`.
 
 ## Review Focus
 1. Text mit Zeichen außerhalb WinAnsi (Emoji, „→“), Zeilenumbrüchen und 300 Zeichen ohne Leerzeichen darf die Prüfseite nicht zum Absturz bringen (Task 6).
@@ -90,7 +90,7 @@
 - [ ] **Schritt 2:** `node --test test/handy.test.js` → FAIL.
 - [ ] **Schritt 3: Implementieren.** Cache-Schlüssel `sig_<token>`, Wert JSON `{mail, b64}` (`b64:null` bis zum Upload), Ablauf 600 Sekunden, Token vor Gebrauch auf `[a-f0-9]` reinigen. `mbSigAbholen` löscht den Eintrag nach der Ausgabe.
 - [ ] **Schritt 4: Anbindung:** in `montageberichteAnfrage` `mb_unterschrift_code` (Zufall `Utilities.getUuid().replace(/-/g,'').slice(0,24)`, `qr` = `qrBmpBase64(link, 6)` aus `QrCode.js` im Projekt) und `mb_unterschrift_abholen` verdrahten; global `function mbHandySig(d){ return mbSigHandy(d, CacheService.getScriptCache()); }` für `Code.gs`.
-- [ ] **Schritt 5:** `node --test test/` → PASS. **Schritt 6: Commit** `feat(server): Unterschrift vom Handy abholen`
+- [ ] **Schritt 5:** `node --test "test/*.test.js"` → PASS. **Schritt 6: Commit** `feat(server): Unterschrift vom Handy abholen`
 
 ### Task 4: Handy-Seite und Anleitung zum Einspielen
 
@@ -99,7 +99,7 @@
 - [ ] **Schritt 1: Test** `test/handy-seite.test.js`: Datei `docs/handy/index.html` enthält `event: "h_sig"`, `aktion: "hochladen"`, `capture="environment"`, `text/plain`, `credentials: "omit"` und die Adresse des Anmeldeservers aus `docs/handy/index.html` des Service-Mappe-Repositorys (Konstante `SERVER`, nur gelesen: `https://script.google.com/macros/s/AKfycbwj7l1K2RcGtPUu4wdRFjI7NLayzAtqjx0_XorzQmMNEqh-JyuEaOrUlOEN1BT9HVSC/exec`). → FAIL.
 - [ ] **Schritt 2: Seite schreiben** (eine Datei, kein Framework, Bauweise wie die vorhandene Handy-Seite: `fetch` mit `text/plain`, Antwort `OK\n…` oder `FEHLER\n…`): Code aus `?sig=` lesen und mit `aktion: "pruefen"` prüfen (`'1'` sonst Hinweis „Bitte im Programm erneut auf Unterschrift hinterlegen klicken“); Knopf „Unterschrift fotografieren“; Foto verkleinern (Breite 900 px, JPEG-Qualität 0,7, bis Base64 höchstens 90000 Zeichen, sonst Breite um 15 % und Qualität um 0,1 senken, Mindestbreite 300); Vorschau; „Senden“; Erfolg „Fertig – du kannst die Seite schließen.“; Fehler sichtbar.
 - [ ] **Schritt 3: `docs/server-einspielen.md`** (Schritt für Schritt für Benjamin): (a) `server/Montageberichte.js` ohne die letzte Zeile als Datei ins Apps-Script-Projekt „PDF Unterschreiben Anmeldung“ kopieren (vorhandene ersetzen); (b) in `Code.gs` die Zeile mit `/^mb_(monteure|liste|datei)$/` ersetzen durch `/^mb_(monteure|liste|datei|vermerke|korrektur|klaerung|abzeichnen|unterschrift_datei|unterschrift_code|unterschrift_abholen)$/`; (c) in `Code.gs` `/^h_(check|foto|ts|vk|vorschau|vorschaubild)$/` ersetzen durch `/^h_(check|foto|ts|vk|vorschau|vorschaubild|sig)$/`; (d) in `handyAnfrage` vor `throw new Error('Unbekannte Anfrage.')` einfügen `if (d.event === 'h_sig') return mbHandySig(d);`; (e) Bereitstellung bearbeiten und neue Version veröffentlichen; (f) GitHub Pages für dieses Repository einschalten (Quelle: Branch `main`, Ordner `/docs`). Jeweils mit Hinweis, woran man sieht, dass es klappt.
-- [ ] **Schritt 4:** `node --test test/` → PASS. **Schritt 5: Commit** `feat: Handy-Seite für die Unterschrift und Anleitung zum Einspielen`
+- [ ] **Schritt 4:** `node --test "test/*.test.js"` → PASS. **Schritt 5: Commit** `feat: Handy-Seite für die Unterschrift und Anleitung zum Einspielen`
 
 ### Task 5: Unterschrift-Foto freistellen
 
@@ -190,7 +190,7 @@
 
 - [ ] **Schritt 1:** `README.md` um Abschnitte „Korrekturen und Abzeichnen“ und „Unterschrift per Handy“ ergänzen (kurz, Verweis auf `docs/server-einspielen.md`; Satz zum Server-Teil anpassen).
 - [ ] **Schritt 2:** `echo 1.1.0 > TESTVERSION`; `VERSION` bleibt `1.0.1`.
-- [ ] **Schritt 3: Gesamtprüfung:** `NODE_PATH=/opt/npm-tools/node_modules node --test test/` , `go test ./...`, `go vet ./...`, `go build -o /tmp/mb .` → alles ohne Fehler; `git diff --stat main..HEAD` zeigt nur Dateien aus diesem Plan, `VERSION` unverändert.
+- [ ] **Schritt 3: Gesamtprüfung:** `NODE_PATH=/opt/npm-tools/node_modules node --test "test/*.test.js"` , `go test ./...`, `go vet ./...`, `go build -o /tmp/mb .` → alles ohne Fehler; `git diff --stat main..HEAD` zeigt nur Dateien aus diesem Plan, `VERSION` unverändert.
 - [ ] **Schritt 4 (nur wenn ein Browser verfügbar ist):** Oberfläche mit einer Nachbildung des Anmeldeservers ausprobieren (`MB_DEV=1 MB_TEST_SERVER=… go run .`); Anmeldeablauf vorher in `checkAccess` und `refreshBlock` nachlesen. Sonst im Bericht klar sagen, dass die Oberfläche nicht ausprobiert wurde.
 - [ ] **Schritt 5: Commit** `chore: Testversion 1.1.0 und README`, dann `git push` des Zweigs. **Nicht** nach `main` mergen; der Release-Workflow läuft nur auf `main`.
 - [ ] **Schritt 6: Bericht an Benjamin:** was getestet wurde (Befehle mit Ergebnis), was nicht (Windows-Fenster, Handy, QR, echter Server) und die Liste seiner einmaligen Schritte aus `docs/server-einspielen.md`.
