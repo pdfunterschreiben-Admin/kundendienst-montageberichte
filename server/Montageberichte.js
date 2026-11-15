@@ -126,23 +126,23 @@ function mbNutzer(ss, d) {
   return { mail: mail, name: String(r[0] || '') };
 }
 
-// Berichte vom Testkonto sind Testberichte: Nur das Testkonto sieht sie, alle anderen Nutzer nicht.
-function mbOhneTestberichte(zeilen, testMails) {
-  return zeilen.filter(function (r) { return testMails.indexOf(String(r[2]).toLowerCase()) < 0; });
+// Berichte vom Testkonto sind Testberichte. Das Testkonto sieht NUR Testberichte, alle anderen Nutzer sehen sie nicht.
+function mbSichtbar(zeilen, testMails, istTestkonto) {
+  return zeilen.filter(function (r) { return (testMails.indexOf(String(r[2]).toLowerCase()) >= 0) === istTestkonto; });
 }
 
-let MB_NUR_ECHTE = false; // pro Anfrage gesetzt (siehe montageberichteAnfrage)
+let MB_TESTKONTO = false; // pro Anfrage gesetzt (siehe montageberichteAnfrage)
 
 function mbZeilen() {
   const s = mbBlatt(), last = s.getLastRow();
   const z = last < 2 ? [] : s.getRange(2, 1, last - 1, MB_HEAD.length).getValues();
-  return MB_NUR_ECHTE ? mbOhneTestberichte(z, MB_TEST_MAILS) : z;
+  return mbSichtbar(z, MB_TEST_MAILS, MB_TESTKONTO);
 }
 
 function montageberichteAnfrage(d) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const nutzer = mbNutzer(ss, d);
-  MB_NUR_ECHTE = MB_TEST_MAILS.indexOf(nutzer.mail) < 0;
+  MB_TESTKONTO = MB_TEST_MAILS.indexOf(nutzer.mail) >= 0;
   const ev = String(d.event || '');
   if (/^mb_(vermerke|korrektur|klaerung|abzeichnen|unterschrift_datei)$/.test(ev)) {
     const schreiben = /^mb_(korrektur|klaerung|abzeichnen)$/.test(ev);
@@ -403,4 +403,4 @@ function mbVermerkAnfrage(ev, d, nutzer, ablage, jetzt) {
   return { ok: true, stand: stand() };
 }
 
-if (typeof module !== 'undefined') module.exports = { mbOhneTestberichte, mbUebersicht, mbKw, mbDatum, MB_BEREICHE, mbStand, mbVermerkPruefen, mbVermerkAnfrage, MB_HANDY_URL, mbSigCode, mbSigHandy, mbSigAbholen };
+if (typeof module !== 'undefined') module.exports = { mbSichtbar, mbUebersicht, mbKw, mbDatum, MB_BEREICHE, mbStand, mbVermerkPruefen, mbVermerkAnfrage, MB_HANDY_URL, mbSigCode, mbSigHandy, mbSigAbholen };
