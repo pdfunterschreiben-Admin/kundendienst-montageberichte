@@ -285,6 +285,12 @@ textarea:focus-visible{outline:2px solid var(--pen);outline-offset:2px}
         <p class="hint">Fertige PDFs liegen in</p><p class="pfad" id="ablagePfad">…</p>
         <button type="button" id="ablageBtn"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 4.5v8a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-6a1 1 0 0 0-1-1H8L6.5 3.5h-4a1 1 0 0 0-1 1z"/></svg> Ordner öffnen</button>
       </section>
+      <section class="panel" aria-labelledby="h-sig">
+        <div class="step"><h2 id="h-sig">Meine Unterschrift</h2></div>
+        <div class="crop-prev" id="sigAnzeige" style="width:100%"><span class="hint">Noch keine hinterlegt</span></div>
+        <div class="row"><button type="button" id="sigAendern">Ändern</button><button type="button" class="ghost danger" id="sigLoeschen2" hidden>Löschen</button></div>
+        <p class="hint">Gilt für neue Abzeichnungen. Schon abgezeichnete Aufträge behalten ihre Unterschrift.</p>
+      </section>
       <section class="panel" id="adminPanel" aria-labelledby="h-adm" hidden>
         <div class="step"><h2 id="h-adm">Testkanal</h2><span class="chip info">Admin</span></div>
         <label class="check"><input type="checkbox" id="testChannel"> Testversionen vor allen anderen bekommen</label>
@@ -435,6 +441,7 @@ textarea:focus-visible{outline:2px solid var(--pen);outline-offset:2px}
       <section class="col" style="gap:8px">
         <strong>Abzeichnen</strong>
         <div id="pruefAbz" class="hint">Noch nicht abgezeichnet.</div>
+        <button type="button" class="link" id="paSigAendern" style="align-self:flex-start">Unterschrift ändern</button>
         <button type="button" class="primary" id="paSenden">Kontrolliert – abzeichnen</button>
       </section>
     </div>
@@ -975,6 +982,22 @@ $("#pkSenden").onclick = async () => {
 $("#pqSetzen").onclick = async () => { if(await vermerkSenden("mb_klaerung", {aktion: "setzen", text: $("#pqText").value.trim()})) $("#pqText").value = ""; };
 $("#pqErledigt").onclick = () => vermerkSenden("mb_klaerung", {aktion: "erledigt"});
 $("#paSenden").onclick = abzeichnen;
+// Gespeicherte Unterschrift anzeigen, ändern, löschen
+async function unterschriftAnzeigen(){
+  const r = await (await fetch("/api/unterschrift")).json().catch(() => ({}));
+  $("#sigAnzeige").innerHTML = r.vorhanden ? `<img alt="Gespeicherte Unterschrift" src="data:image/png;base64,${r.b64}">` : '<span class="hint">Noch keine hinterlegt</span>';
+  $("#sigLoeschen2").hidden = !r.vorhanden;
+  $("#sigAendern").textContent = r.vorhanden ? "Ändern" : "Hinterlegen";
+}
+async function unterschriftAendern(){ if(await unterschriftHinterlegen()){ toast("Unterschrift gespeichert."); } unterschriftAnzeigen(); }
+$("#sigAendern").onclick = unterschriftAendern;
+$("#paSigAendern").onclick = unterschriftAendern;
+$("#sigLoeschen2").onclick = async () => {
+  if(!confirm("Gespeicherte Unterschrift auf diesem Computer löschen?")) return;
+  await fetch("/api/unterschrift", {method: "DELETE"}).catch(() => {});
+  unterschriftAnzeigen(); toast("Unterschrift gelöscht.");
+};
+unterschriftAnzeigen();
 $("#blockRetry").onclick = async () => {
   const r = await call("check");
   if(r.ok && !r.blocked){ state.blocked = false; persist(); $("#blockDlg").close(); toast("Zugang ist wieder freigegeben."); monteureLaden(); }
