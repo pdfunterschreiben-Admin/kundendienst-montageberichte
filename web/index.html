@@ -171,7 +171,7 @@ dialog::backdrop{background:rgba(10,15,30,.55)}
 .kw{justify-content:space-between;width:100%;padding:6px 10px;font-size:14px}
 .kw.gew{border-color:var(--pen);background:var(--pen);color:#fff}
 .kw.gew .hint{color:#fff;opacity:.85}
-td.inhalt .liste{display:flex;flex-wrap:wrap;gap:6px}
+td .liste{display:flex;flex-wrap:wrap;gap:6px}
 td .chip{white-space:nowrap}
 #ablagePfad{word-break:break-all}
 .chip.montage{background:var(--pen-soft);color:var(--pen)}
@@ -316,6 +316,8 @@ td .chip{white-space:nowrap}
 <div id="toast" role="status" aria-live="polite" hidden><span id="toastText"></span><button type="button" id="toastBtn" hidden></button></div>
 
 <script src="/lib/pdf-lib.min.js"></script>
+<script src="/signatur.js"></script>
+<script src="/pruefseite.js"></script>
 <script>
 (() => {
 const $ = s => document.querySelector(s);
@@ -346,7 +348,7 @@ $("#helpBtn").onclick = () => $("#helpDlg").showModal();
 /* ---------- Montageberichte ---------- */
 const ART_NAME = {montage: "Montagebericht", uvv: "UVV Bericht", dguv: "DGUV V3 Bericht"};
 const ART_ORDNUNG = {montage: 0, uvv: 1, dguv: 2};
-const mb = {monteure: [], offen: "", wahl: null, gruppen: [], laeuft: 0, cache: new Map()};
+const mb = {monteure: [], offen: "", wahl: null, gruppen: [], laeuft: 0, cache: new Map(), vermerke: {}, hinweis: "", sigCache: new Map()};
 async function mbCall(event, extra = {}){
   try{
     return await (await fetch("/api/mb", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({event, ...extra})})).json();
@@ -412,7 +414,12 @@ function gruppieren(berichte){
   return liste.sort((a, b) => (a.nr ? 0 : 1) - (b.nr ? 0 : 1) || a.datum.localeCompare(b.datum) || a.datei.localeCompare(b.datei, "de", {numeric: true}));
 }
 const merkKey = (w, g) => `mb|${w.email}|${w.jahr}|${w.kw}|${g.datei}`;
-function abgelegt(w, g){ try{ return localStorage.getItem(merkKey(w, g)) === g.ids; }catch(e){ return false; } }
+// Stand der Korrekturen, Rückfragen und Abzeichnung je Auftrag (vom Server, Schlüssel ist g.datei)
+const leerStand = () => ({korrekturen: [], klaerung: null, abzeichnung: null, schluessel: "0:0"});
+const standVon = g => (Object.prototype.hasOwnProperty.call(mb.vermerke, g.datei) && mb.vermerke[g.datei]) || leerStand();
+// Die PDF gilt als aktuell, wenn weder die Berichte noch die Vermerke seit dem Erstellen anders sind
+const merkWert = g => g.ids + "|" + standVon(g).schluessel;
+function abgelegt(w, g){ try{ return localStorage.getItem(merkKey(w, g)) === merkWert(g); }catch(e){ return false; } }
 const datumDe = d => /^\d{4}-\d{2}-\d{2}$/.test(d) ? d.split("-").reverse().join(".") : d;
 function renderWoche(){
   const w = mb.wahl, tb = $("#rows"); tb.innerHTML = "";
@@ -421,9 +428,10 @@ function renderWoche(){
     const tr = document.createElement("tr");
     const ok = abgelegt(w, g);
     const status = g.fehler ? `<span class="chip bad" title="${esc(g.fehler)}">Fehler</span>` : g.arbeit ? `<span class="chip info">wird erstellt …</span>` : ok ? `<span class="chip ok">✓ abgelegt</span>` : `<span class="chip warn">wartet</span>`;
+    const chips = statusChips(standVon(g)).map(c => `<span class="chip ${c.klasse}">${esc(c.text)}</span>`).join("");
     tr.innerHTML = `<td class="nr">${g.nr ? esc(g.nr) : '<span class="hint">ohne Nummer</span>'}</td>
       <td class="inhalt"><div class="liste">${g.berichte.map((b, i) => `<span class="chip ${b.art}">${i + 1}. ${esc(ART_NAME[b.art] || b.art)}${b.serie ? ` <span class="ser">${esc(b.serie)}</span>` : ""}</span>`).join("")}</div></td>
-      <td class="ort">${esc(datumDe(g.datum))}</td><td>${status}</td>
+      <td class="ort">${esc(datumDe(g.datum))}</td><td><div class="liste">${status}${chips}</div></td>
       <td class="akt"><button type="button" ${ok ? "" : "disabled"}>📄 Öffnen</button></td>`;
     tr.querySelector("button").onclick = () => zeigen({datei: g.datei});
     tb.appendChild(tr);
@@ -446,12 +454,17 @@ async function kwOeffnen(m, k, scroll = true){
   $("#kwInfo").textContent = "Berichte werden geladen …";
   $("#kwOrdner").hidden = false; $("#kwNeu").hidden = false;
   $("#emptyBox").hidden = true; $("#tableBox").hidden = false; $("#rows").innerHTML = "";
+  mb.vermerke = {}; mb.hinweis = "";
   const r = await mbCall("mb_liste", {monteur: m.email, jahr: k.jahr, kw: k.kw});
   if(mb.wahl.email !== m.email || mb.wahl.kw !== k.kw || mb.wahl.jahr !== k.jahr) return;
   if(!r.ok){ $("#kwInfo").textContent = r.error || "Konnte nicht geladen werden."; return; }
   mb.gruppen = gruppieren(r.berichte || []);
+  const v = await mbCall("mb_vermerke", {monteur: m.email, jahr: k.jahr, kw: k.kw});
+  if(mb.wahl.email !== m.email || mb.wahl.kw !== k.kw || mb.wahl.jahr !== k.jahr) return;
+  mb.vermerke = v.ok ? (v.vermerke || {}) : {};
+  mb.hinweis = serverHinweis(v);
   const n = (r.berichte || []).length;
-  $("#kwInfo").textContent = `${n} ${n === 1 ? "Bericht" : "Berichte"} in ${mb.gruppen.length} ${mb.gruppen.length === 1 ? "Auftrag" : "Aufträgen"}`;
+  $("#kwInfo").textContent = `${n} ${n === 1 ? "Bericht" : "Berichte"} in ${mb.gruppen.length} ${mb.gruppen.length === 1 ? "Auftrag" : "Aufträgen"}` + (mb.hinweis ? " · " + mb.hinweis : "");
   renderWoche();
   erstellen();
 }
@@ -464,6 +477,18 @@ async function pdfHolen(id){
   for(let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
   if(mb.cache.size > 200) mb.cache.clear();
   mb.cache.set(id, u);
+  return u;
+}
+// Unterschrift einer Abzeichnung vom Server holen (PNG), je ID nur einmal
+async function unterschriftFuer(stand){
+  const id = stand.abzeichnung && stand.abzeichnung.unterschriftId;
+  if(!id) return null;
+  if(mb.sigCache.has(id)) return mb.sigCache.get(id);
+  const r = await mbCall("mb_unterschrift_datei", {datei: id});
+  if(!r.ok) throw new Error(r.error || "Unterschrift konnte nicht geladen werden.");
+  const bin = atob(r.b64), u = new Uint8Array(bin.length);
+  for(let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+  mb.sigCache.set(id, u);
   return u;
 }
 function b64(bytes){ let s = ""; for(let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000)); return btoa(s); }
@@ -479,6 +504,7 @@ async function erstellen(){
     if(abgelegt(w, g)) continue;
     g.arbeit = true; g.fehler = ""; renderWoche();
     try{
+      const wert = merkWert(g), stand = standVon(g);   // so, wie es beim Erstellen war – spätere Änderungen erzwingen eine neue PDF
       const ziel = await PDFLib.PDFDocument.create();
       ziel.setTitle(g.nr ? `Auftrag ${g.nr}` : g.datei); ziel.setAuthor(w.name); ziel.setProducer("Kundendienst Montageberichte");
       for(const b of g.berichte){
@@ -486,11 +512,13 @@ async function erstellen(){
         const seiten = await ziel.copyPages(quelle, quelle.getPageIndices());
         seiten.forEach(s => ziel.addPage(s));
       }
+      await pruefseiteAnhaengen(ziel, PDFLib, {auftrag: g.datei, monteur: w.name, kw: kwText(w), korrekturen: stand.korrekturen,
+        klaerung: stand.klaerung, abzeichnung: stand.abzeichnung, unterschrift: await unterschriftFuer(stand)});
       const bytes = await ziel.save();
       const r = await (await fetch("/api/ablage", {method: "POST", headers: {"Content-Type": "application/json"},
         body: JSON.stringify({monteur: w.name, jahr: w.jahr, kw: w.kw, datei: g.datei, b64: b64(bytes)})})).json();
       if(!r.ok) throw new Error(r.error || "Speichern fehlgeschlagen.");
-      try{ localStorage.setItem(merkKey(w, g), g.ids); }catch(e){}
+      try{ localStorage.setItem(merkKey(w, g), wert); }catch(e){}
       neu++;
     }catch(e){ g.fehler = e.message || String(e); fehler++; }
     g.arbeit = false;
