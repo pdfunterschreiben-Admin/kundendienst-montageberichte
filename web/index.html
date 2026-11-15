@@ -194,20 +194,19 @@ td .chip{white-space:nowrap}
 
 /* ---------- Erscheinungsbild Büro-Programm ---------- */
 :root{--paper:#eef1f5;--sheet:#fff;--ink:#1a2433;--muted:#5d6878;--line:#d9dee6;--pen:#1f4fa8;--pen-soft:#e6edf9;--row:#f6f8fb;
-  --bar:#1b2a41;--bar-ink:#e8edf5;--bar-muted:#a9b6ca;--gelb:#f2b705}
+  --bar:#1b2a41;--bar-ink:#e8edf5;--bar-muted:#a9b6ca;--gelb:#da251d}
 @media (prefers-color-scheme: dark){:root{--paper:#11161f;--sheet:#182030;--ink:#e4e9f1;--muted:#9aa6b8;--line:#2a3447;--pen:#8bb0ff;--pen-soft:#1d2b48;--row:#1c2537;--bar:#0b111b;--bar-ink:#e4e9f1;--bar-muted:#8d9ab0}}
 body{padding:0;font-size:14px;height:100vh;display:flex;flex-direction:column;overflow:hidden}
 .ic{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
 .appbar{flex:none;display:flex;align-items:center;justify-content:space-between;gap:16px;height:52px;padding:0 18px;background:var(--bar);color:var(--bar-ink);border-bottom:3px solid var(--gelb)}
 .marke{display:flex;align-items:center;gap:11px;min-width:0}
-.logo{width:22px;height:22px;border-radius:5px;background:var(--gelb);box-shadow:inset 0 -7px 0 rgba(0,0,0,.18)}
 .appbar h1{font:600 16px/1 var(--f-display);letter-spacing:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .appbar-r{display:flex;align-items:center;gap:6px;font-size:13px;min-width:0}
 .appbar .nutzer{margin:0 8px 0 0;display:flex;align-items:center;gap:10px;color:var(--bar-ink)}
 .appbar .nutzer .link{color:var(--bar-muted);text-decoration:none;font-size:13px}
 .appbar .nutzer .link:hover{color:#fff;text-decoration:underline}
 .appbar .ver{font:13px var(--f-body);color:var(--bar-muted);display:inline-flex;gap:8px;align-items:center;padding:0 8px;border-left:1px solid rgba(255,255,255,.14)}
-.appbar .ver .test{color:var(--bar);background:var(--gelb);font-weight:600;font-size:12px;padding:1px 7px;border-radius:4px}
+.appbar .ver .test{color:#fff;background:var(--gelb);font-weight:600;font-size:12px;padding:1px 7px;border-radius:4px}
 button.bar{background:transparent;border-color:transparent;color:var(--bar-ink);padding:6px 10px;font-size:13px}
 button.bar:hover{background:rgba(255,255,255,.1);border-color:transparent}
 .wrap{flex:1;min-height:0;max-width:none;margin:0;gap:0}
@@ -273,12 +272,22 @@ details.fach[open]{padding-bottom:6px}
 #sigAnzeige{height:64px}
 #sigAnzeige img{max-width:100%;max-height:100%;object-fit:contain}
 tr.klickbar{cursor:pointer}
+/* Firmenbild in der Leiste, Logo als Wasserzeichen */
+.appbar{height:92px;background:linear-gradient(90deg,rgba(6,14,32,.95) 0%,rgba(6,14,32,.55) 26%,rgba(6,14,32,.05) 38%,rgba(6,14,32,.05) 46%,rgba(6,14,32,.88) 56%,rgba(6,14,32,.95) 100%),url(/firma.jpg) 50% 62%/cover no-repeat,var(--bar)}
+.appbar h1{font-size:20px}
+.appbar h1{font-size:18px;text-shadow:0 1px 3px rgba(0,0,0,.6)}
+main{background:linear-gradient(color-mix(in srgb,var(--paper) 93%,transparent),color-mix(in srgb,var(--paper) 93%,transparent)),url(/logo.png) center 72%/min(60%,760px) auto no-repeat var(--paper);background-attachment:fixed}
+/* Prüfen-Fenster: minimieren und maximieren */
+#pruefDlg.max{width:100vw;height:100vh;max-width:100vw;max-height:100vh;border-radius:0;resize:none}
+.fenster{display:flex;gap:2px}
+.fenster button{padding:6px 9px}
+#pruefMini{position:fixed;right:18px;bottom:18px;z-index:40;display:flex;align-items:center;gap:10px;background:var(--sheet);border:1px solid var(--line);border-left:3px solid var(--gelb);border-radius:8px;padding:8px 8px 8px 14px;box-shadow:0 8px 24px rgba(0,0,0,.18);font-size:13.5px}
 @media (max-width:960px){body{height:auto;overflow:auto}.grid{grid-template-columns:minmax(0,1fr)}aside{border-right:0}.appbar{height:auto;flex-wrap:wrap;padding:10px 14px}}
 </style>
 </head>
 <body>
 <header class="appbar">
-  <div class="marke"><span class="logo" aria-hidden="true"></span><h1>Kundendienst Montageberichte</h1></div>
+  <div class="marke"><h1>Kundendienst Montageberichte</h1></div>
   <div class="appbar-r">
     <p class="nutzer" id="userLine" hidden></p>
     <span class="ver" id="verText">Version …</span>
@@ -436,9 +445,11 @@ tr.klickbar{cursor:pointer}
   </div>
 </dialog>
 
+<div id="pruefMini" hidden><span id="pruefMiniText"></span><button type="button" class="primary" id="pruefMiniAuf">Wiederherstellen</button><button type="button" class="ghost" id="pruefMiniZu" aria-label="Schließen">Schließen</button></div>
+
 <dialog id="pruefDlg">
   <div class="dlg">
-    <div class="dlg-head"><strong id="pruefTitel">Bericht prüfen</strong><span class="row" style="gap:8px"><button type="button" class="ghost" id="pruefExtern" title="Mit dem PDF-Programm von Windows öffnen"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M9 2.5h4.5V7M13.5 2.5 7 9M11.5 9.5v4h-9v-9h4"/></svg> Extern öffnen</button><button type="button" class="ghost" id="pruefZu">Schließen</button></span></div>
+    <div class="dlg-head"><strong id="pruefTitel">Bericht prüfen</strong><span class="row" style="gap:8px"><span class="fenster"><button type="button" class="ghost" id="pruefMin" title="Minimieren" aria-label="Minimieren"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 12.5h10"/></svg></button><button type="button" class="ghost" id="pruefMax" title="Maximieren" aria-label="Maximieren"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><rect x="2.5" y="2.5" width="11" height="11" rx="1"/></svg></button></span><button type="button" class="ghost" id="pruefExtern" title="Mit dem PDF-Programm von Windows öffnen"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M9 2.5h4.5V7M13.5 2.5 7 9M11.5 9.5v4h-9v-9h4"/></svg> Extern öffnen</button><button type="button" class="ghost" id="pruefZu">Schließen</button></span></div>
     <div class="pruef-grid">
     <div class="pruef-pdfbox"><iframe id="pruefPdf" class="pruef-pdf" title="Bericht" hidden></iframe><div id="pruefPdfLeer" class="hint">PDF wird erstellt …</div></div>
     <div class="dlg-body col" style="gap:16px">
@@ -549,7 +560,7 @@ function pruefSperren(an){ pruefBusy = an; document.querySelectorAll("#pruefDlg 
 function pruefenOeffnen(g){
   pruefG = g; $("#pruefFehler").hidden = true;
   ["#pkVorher", "#pkNachher", "#pqText"].forEach(i => $(i).value = "");
-  pruefPdfWert = ""; pruefZeichnen(); pruefPdfLaden(); $("#pruefDlg").showModal();
+  $("#pruefMini").hidden = true; pruefPdfWert = ""; pruefZeichnen(); pruefPdfLaden(); $("#pruefDlg").showModal();
 }
 async function vermerkSenden(ereignis, extra = {}){
   const w = mb.wahl, g = pruefG; if(!w || !g || pruefBusy) return false;
@@ -986,6 +997,19 @@ $("#codeForm").addEventListener("submit", async e => {
   if(state.blocked) $("#blockDlg").showModal(); else { toast("Freigeschaltet."); angemeldetWechsel(); }
 });
 $("#pruefZu").onclick = () => $("#pruefDlg").close();
+// Minimieren: Fenster zu, unten rechts bleibt eine Leiste zum Wiederherstellen
+$("#pruefMin").onclick = () => {
+  if(!pruefG) return;
+  $("#pruefMiniText").textContent = "Auftrag " + (pruefG.nr || pruefG.datei) + " prüfen";
+  $("#pruefDlg").close(); $("#pruefMini").hidden = false;
+};
+$("#pruefMiniAuf").onclick = () => { if(!pruefG) return; $("#pruefMini").hidden = true; pruefZeichnen(); pruefPdfLaden(); $("#pruefDlg").showModal(); };
+$("#pruefMiniZu").onclick = () => { $("#pruefMini").hidden = true; pruefG = null; };
+$("#pruefMax").onclick = () => {
+  const max = $("#pruefDlg").classList.toggle("max");
+  $("#pruefMax").title = $("#pruefMax").ariaLabel = max ? "Verkleinern" : "Maximieren";
+  $("#pruefMax").innerHTML = max ? '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><rect x="2.5" y="5" width="8.5" height="8.5" rx="1"/><path d="M5 5V2.5h8.5V11H11"/></svg>' : '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><rect x="2.5" y="2.5" width="11" height="11" rx="1"/></svg>';
+};
 $("#pruefDlg").addEventListener("close", () => { $("#pruefPdf").src = "about:blank"; pruefPdfWert = ""; });
 $("#pruefExtern").onclick = () => { if(pruefG) zeigen({datei: pruefG.datei}); };
 $("#pkSenden").onclick = async () => {
