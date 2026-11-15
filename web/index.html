@@ -330,7 +330,7 @@ button.burger .ic{width:20px;height:20px}
         <div class="m-teil m-knoepfe"><button type="button" class="m-zeile" id="checkBtn" hidden>Nach Updates suchen</button><button type="button" class="m-zeile" id="helpBtn">Anleitung</button></div>
         <div class="m-teil"><b>Ablage</b><p class="hint">Fertige PDFs liegen in</p><p class="pfad" id="ablagePfad">…</p>
         <p class="err" id="ablageFehlt" hidden></p><div class="row"><button type="button" id="ablageBtn"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 4.5v8a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-6a1 1 0 0 0-1-1H8L6.5 3.5h-4a1 1 0 0 0-1 1z"/></svg> Ordner öffnen</button><button type="button" id="ablageWahl">Ändern …</button></div></div>
-        <div class="m-teil"><b>Fertige Berichte fürs Büro</b><p class="hint">Abgezeichnete Aufträge werden zusätzlich hierhin kopiert (Auftragsnummer.pdf).</p><p class="pfad" id="fertigPfad">nicht eingestellt</p><p class="err" id="fertigFehlt" hidden></p><div class="row"><button type="button" id="fertigWahl">Ordner wählen …</button><button type="button" class="ghost danger" id="fertigAus" hidden>Ausschalten</button></div></div>
+        <div class="m-teil"><b>Fertige Berichte fürs Büro</b><p class="hint">Abgezeichnete Aufträge werden zusätzlich hierhin kopiert (Auftragsnummer.pdf). Nichts wird überschrieben: eine neue Fassung heißt „Nr (2).pdf“.</p><p class="pfad" id="fertigPfad">nicht eingestellt</p><p class="err" id="fertigFehlt" hidden></p><div class="row"><button type="button" id="fertigWahl">Ordner wählen …</button><button type="button" class="ghost danger" id="fertigAus" hidden>Ausschalten</button></div></div>
         <div class="m-teil"><b>Meine Unterschrift <span class="hint" id="sigStatus"></span></b><div class="crop-prev" id="sigAnzeige" style="width:100%"><span class="hint">Noch keine hinterlegt</span></div>
         <div class="row"><button type="button" id="sigAendern">Ändern</button><button type="button" class="ghost danger" id="sigLoeschen2" hidden>Löschen</button></div>
         <p class="hint">Gilt für neue Abzeichnungen. Schon abgezeichnete Aufträge behalten ihre Unterschrift.</p></div>
@@ -942,6 +942,9 @@ async function erstellen(){
       const wert = merkWert(g), stand = standVon(g);   // so, wie es beim Erstellen war – spätere Änderungen erzwingen eine neue PDF
       const ziel = await PDFLib.PDFDocument.create();
       ziel.setTitle(g.nr ? `Auftrag ${g.nr}` : g.datei); ziel.setAuthor(w.name); ziel.setProducer("Kundendienst Montageberichte");
+      // Kennung der Abzeichnung: damit dieselbe Abzeichnung nur einmal in den Ordner für fertige Berichte kommt
+      const kennung = stand.abzeichnung ? `MB-ABZ-${g.datei}-${stand.abzeichnung.t}` : "";
+      if(kennung) ziel.getInfoDict().set(PDFLib.PDFName.of("MBKennung"), PDFLib.PDFString.of(kennung));   // lesbar im Klartext
       for(const b of g.berichte){
         const quelle = await PDFLib.PDFDocument.load(await pdfHolen(b.id), {ignoreEncryption: true});
         const seiten = await ziel.copyPages(quelle, quelle.getPageIndices());
@@ -949,13 +952,13 @@ async function erstellen(){
       }
       await pruefseiteAnhaengen(ziel, PDFLib, {auftrag: g.datei, monteur: w.name, kw: kwText(w), korrekturen: stand.korrekturen,
         klaerung: stand.klaerung, abzeichnung: stand.abzeichnung, unterschrift: await unterschriftFuer(stand)});
-      const bytes = await ziel.save();
+      const bytes = await ziel.save(kennung ? {useObjectStreams: false} : {});
       const r = await (await fetch("/api/ablage", {method: "POST", headers: {"Content-Type": "application/json"},
         body: JSON.stringify({monteur: w.name, jahr: w.jahr, kw: w.kw, datei: g.datei, b64: b64(bytes)})})).json();
       if(!r.ok) throw new Error(r.error || "Speichern fehlgeschlagen.");
       if(stand.abzeichnung){
         const f = await (await fetch("/api/fertig", {method: "POST", headers: {"Content-Type": "application/json"},
-          body: JSON.stringify({datei: g.datei, b64: b64(bytes)})})).json().catch(() => ({ok: false, error: "Keine Verbindung zum Programm."}));
+          body: JSON.stringify({datei: g.datei, b64: b64(bytes), kennung})})).json().catch(() => ({ok: false, error: "Keine Verbindung zum Programm."}));
         if(!f.ok && !f.aus) throw new Error("Abgelegt, aber nicht in den Ordner für fertige Berichte: " + (f.error || ""));
       }
       try{ localStorage.setItem(merkKey(w, g), wert); }catch(e){}
