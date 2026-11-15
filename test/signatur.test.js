@@ -46,3 +46,24 @@ test('sehr kleines Foto (30x20) mit Unterschrift geht', () => {
   assert.ok(r.breite <= 30 && r.hoehe <= 20);
   assert.ok(r.pixel.some((v, i) => i % 4 === 3 && v >= 200));
 });
+
+const { nurTinte } = require('../web/signatur.js');
+// RGBA mit voller Deckkraft; fn(x, y) gibt [r, g, b] zurück
+function farbbild(w, h, fn) {
+  const p = new Uint8ClampedArray(w * h * 4);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const i = (y * w + x) * 4, c = fn(x, y); p[i] = c[0]; p[i + 1] = c[1]; p[i + 2] = c[2]; p[i + 3] = 255; }
+  return p;
+}
+
+test('nurTinte: bei blauer Unterschrift verschwinden schwarze Linien', () => {
+  const p = farbbild(40, 20, (x, y) => y < 10 ? [30, 50, 200] : [20, 20, 20]);
+  nurTinte(p);
+  assert.equal(p[(2 * 40 + 5) * 4 + 3], 255, 'blau bleibt');
+  assert.equal(p[(15 * 40 + 5) * 4 + 3], 0, 'schwarz wird durchsichtig');
+});
+
+test('nurTinte: schwarze Unterschrift bleibt unverändert', () => {
+  const p = farbbild(40, 20, () => [20, 20, 20]);
+  nurTinte(p);
+  assert.ok([...p].every((v, i) => i % 4 !== 3 || v === 255));
+});

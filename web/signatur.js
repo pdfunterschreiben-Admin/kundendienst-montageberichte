@@ -37,4 +37,19 @@ function freistellen(pixel, breite, hoehe) {
   return { pixel: aus, breite: cw, hoehe: ch };
 }
 
-if (typeof module !== 'undefined') module.exports = { freistellen };
+// Wie in der Service-Mappe: ist die Unterschrift farbig (meist blau), werden schwarze und graue Teile
+// (Formularlinien, gedruckter Text) durchsichtig. Ändert pixel (RGBA) direkt.
+function nurTinte(pixel) {
+  let tinte = 0, farbig = 0;
+  for (let i = 0; i < pixel.length; i += 4) {
+    if (pixel[i + 3] < 60) continue; tinte++;
+    if (Math.max(pixel[i], pixel[i + 1], pixel[i + 2]) - Math.min(pixel[i], pixel[i + 1], pixel[i + 2]) > 45) farbig++;
+  }
+  if (farbig < 40 || farbig < tinte * 0.1) return;
+  for (let i = 0; i < pixel.length; i += 4) {
+    const sat = Math.max(pixel[i], pixel[i + 1], pixel[i + 2]) - Math.min(pixel[i], pixel[i + 1], pixel[i + 2]);
+    if (sat < 30) pixel[i + 3] = 0; else if (sat < 45) pixel[i + 3] = Math.round(pixel[i + 3] * (sat - 30) / 15);
+  }
+}
+
+if (typeof module !== 'undefined') module.exports = { freistellen, nurTinte };
