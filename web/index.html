@@ -681,20 +681,22 @@ $("#neuLaden").onclick = () => { monteureLaden(); if(mb.wahl) kwOeffnen(mb.wahl.
 // Berichte einer Woche nach Auftragsnummer bündeln; ohne Nummer über die Seriennummer zuordnen
 const normSer = s => String(s || "").toUpperCase().replace(/[^A-Z0-9]/g, "").replace(/O/g, "0").replace(/[IL]/g, "1");
 const normNr = s => String(s || "").trim().toUpperCase().replace(/\s+/g, "");
+// Nur eine echte Seriennummer (mind. 5 Ziffern) verbindet Berichte – der Typ allein („LPE250“) nicht
+const serOk = s => (normSer(s).match(/\d/g) || []).length >= 5;
 function gruppieren(berichte){
   const g = new Map(), serZuNr = new Map();
-  for(const b of berichte) if(normNr(b.nr) && normSer(b.serie).length >= 4) serZuNr.set(normSer(b.serie), normNr(b.nr));
+  for(const b of berichte) if(normNr(b.nr) && serOk(b.serie)) serZuNr.set(normSer(b.serie), normNr(b.nr));
   for(const b of berichte){
     let k = normNr(b.nr);
-    if(!k && normSer(b.serie).length >= 4) k = serZuNr.get(normSer(b.serie)) || "";
-    const key = k || "ohne:" + (normSer(b.serie) || b.id);
+    if(!k && serOk(b.serie)) k = serZuNr.get(normSer(b.serie)) || "";
+    const key = k || "ohne:" + (serOk(b.serie) ? normSer(b.serie) : b.id);
     if(!g.has(key)) g.set(key, {key, nr: k, serie: b.serie, berichte: []});
     g.get(key).berichte.push(b);
   }
   const liste = [...g.values()];
   for(const x of liste){
     x.berichte.sort((a, b) => (ART_ORDNUNG[a.art] ?? 9) - (ART_ORDNUNG[b.art] ?? 9) || normSer(a.serie).localeCompare(normSer(b.serie)) || a.eingang - b.eingang);
-    x.datei = x.nr ? x.nr : "ohne Auftragsnummer " + (x.serie ? x.serie : x.berichte[0].datei.replace(/\.pdf$/i, ""));
+    x.datei = x.nr ? x.nr : "ohne Auftragsnummer " + (serOk(x.serie) ? x.serie : x.berichte[0].datei.replace(/\.pdf$/i, ""));
     x.datum = x.berichte.map(b => b.datum).sort()[0] || "";
     x.ids = x.berichte.map(b => b.id).join(",");
   }
