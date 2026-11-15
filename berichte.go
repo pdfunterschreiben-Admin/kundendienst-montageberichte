@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -193,6 +194,32 @@ func (a *app) handleAblageZeigen(w http.ResponseWriter, r *http.Request) {
 		ordnerZeigen(p)
 	}
 	writeJSON(w, map[string]any{"ok": true})
+}
+
+// GET: die abgelegte PDF eines Auftrags zum Anzeigen im Programm (Query: monteur, jahr, kw, datei)
+func (a *app) handleAblagePdf(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "GET", http.StatusMethodNotAllowed)
+		return
+	}
+	q := r.URL.Query()
+	jahr, _ := strconv.Atoi(q.Get("jahr"))
+	kw, _ := strconv.Atoi(q.Get("kw"))
+	d, err := kwOrdner(q.Get("monteur"), jahr, kw)
+	n := sauber(strings.TrimSuffix(q.Get("datei"), ".pdf"))
+	if err != nil || n == "" || n != strings.TrimSuffix(q.Get("datei"), ".pdf") {
+		http.Error(w, "Ungültige Angaben.", http.StatusBadRequest)
+		return
+	}
+	b, err := os.ReadFile(filepath.Join(d, n+".pdf"))
+	if err != nil {
+		http.Error(w, "Noch nicht abgelegt.", http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "application/pdf")
+	w.Header().Set("Content-Disposition", "inline")
+	w.Header().Set("Cache-Control", "no-store")
+	_, _ = w.Write(b)
 }
 
 // pdf-lib (zum Zusammenfügen der PDFs) wird beim ersten Mal aus dem Netz geholt und zwischengespeichert.

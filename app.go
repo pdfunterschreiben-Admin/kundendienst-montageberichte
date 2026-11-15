@@ -119,6 +119,7 @@ func (a *app) routes() http.Handler {
 	mux.HandleFunc("/api/unterschrift", a.handleUnterschrift)
 	mux.HandleFunc("/api/ablage", a.handleAblage)
 	mux.HandleFunc("/api/ablage/zeigen", a.handleAblageZeigen)
+	mux.HandleFunc("/api/ablage/pdf", a.handleAblagePdf)
 	mux.HandleFunc("/api/open", func(w http.ResponseWriter, r *http.Request) {
 		// Nur feste Adressen im Standardbrowser öffnen (dort ist man bei Google angemeldet)
 		links := map[string]string{
