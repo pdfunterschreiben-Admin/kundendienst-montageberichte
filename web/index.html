@@ -462,6 +462,7 @@ textarea:focus-visible{outline:2px solid var(--pen);outline-offset:2px}
 <script src="/lib/pdf-lib.min.js"></script>
 <script src="/signatur.js"></script>
 <script src="/pruefseite.js"></script>
+<script src="/gruppen.js"></script>
 <script>
 (() => {
 const $ = s => document.querySelector(s);
@@ -491,7 +492,6 @@ $("#helpBtn").onclick = () => $("#helpDlg").showModal();
 
 /* ---------- Montageberichte ---------- */
 const ART_NAME = {montage: "Montagebericht", uvv: "UVV Bericht", dguv: "DGUV V3 Bericht"};
-const ART_ORDNUNG = {montage: 0, uvv: 1, dguv: 2};
 const mb = {monteure: [], offen: "", wahl: null, gruppen: [], laeuft: 0, cache: new Map(), vermerke: {}, hinweis: "", sigCache: new Map()};
 async function mbCall(event, extra = {}){
   try{
@@ -685,30 +685,6 @@ async function monteureLaden(){
 }
 $("#neuLaden").onclick = () => { monteureLaden(); if(mb.wahl) kwOeffnen(mb.wahl.m, mb.wahl.k, false); };
 
-// Berichte einer Woche nach Auftragsnummer bündeln; ohne Nummer über die Seriennummer zuordnen
-const normSer = s => String(s || "").toUpperCase().replace(/[^A-Z0-9]/g, "").replace(/O/g, "0").replace(/[IL]/g, "1");
-const normNr = s => String(s || "").trim().toUpperCase().replace(/\s+/g, "");
-// Nur eine echte Seriennummer (mind. 5 Ziffern) verbindet Berichte – der Typ allein („LPE250“) nicht
-const serOk = s => (normSer(s).match(/\d/g) || []).length >= 5;
-function gruppieren(berichte){
-  const g = new Map(), serZuNr = new Map();
-  for(const b of berichte) if(normNr(b.nr) && serOk(b.serie)) serZuNr.set(normSer(b.serie), normNr(b.nr));
-  for(const b of berichte){
-    let k = normNr(b.nr);
-    if(!k && serOk(b.serie)) k = serZuNr.get(normSer(b.serie)) || "";
-    const key = k || "ohne:" + (serOk(b.serie) ? normSer(b.serie) : b.id);
-    if(!g.has(key)) g.set(key, {key, nr: k, serie: b.serie, berichte: []});
-    g.get(key).berichte.push(b);
-  }
-  const liste = [...g.values()];
-  for(const x of liste){
-    x.berichte.sort((a, b) => (ART_ORDNUNG[a.art] ?? 9) - (ART_ORDNUNG[b.art] ?? 9) || normSer(a.serie).localeCompare(normSer(b.serie)) || a.eingang - b.eingang);
-    x.datei = x.nr ? x.nr : "ohne Auftragsnummer " + (serOk(x.serie) ? x.serie : x.berichte[0].datei.replace(/\.pdf$/i, ""));
-    x.datum = x.berichte.map(b => b.datum).sort()[0] || "";
-    x.ids = x.berichte.map(b => b.id).join(",");
-  }
-  return liste.sort((a, b) => (a.nr ? 0 : 1) - (b.nr ? 0 : 1) || a.datum.localeCompare(b.datum) || a.datei.localeCompare(b.datei, "de", {numeric: true}));
-}
 const merkKey = (w, g) => `mb|${w.email}|${w.jahr}|${w.kw}|${g.datei}`;
 // Stand der Korrekturen, Rückfragen und Abzeichnung je Auftrag (vom Server, Schlüssel ist g.datei)
 const leerStand = () => ({korrekturen: [], klaerung: null, abzeichnung: null, schluessel: "0:0"});
