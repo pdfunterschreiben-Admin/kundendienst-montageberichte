@@ -285,6 +285,12 @@ textarea:focus-visible{outline:2px solid var(--pen);outline-offset:2px}
         <p class="hint">Fertige PDFs liegen in</p><p class="pfad" id="ablagePfad">…</p>
         <button type="button" id="ablageBtn"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 4.5v8a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-6a1 1 0 0 0-1-1H8L6.5 3.5h-4a1 1 0 0 0-1 1z"/></svg> Ordner öffnen</button>
       </section>
+      <section class="panel" aria-labelledby="h-sig">
+        <div class="step"><h2 id="h-sig">Meine Unterschrift</h2></div>
+        <div class="crop-prev" id="sigAnzeige" style="width:100%"><span class="hint">Noch keine hinterlegt</span></div>
+        <div class="row"><button type="button" id="sigAendern">Ändern</button><button type="button" class="ghost danger" id="sigLoeschen2" hidden>Löschen</button></div>
+        <p class="hint">Gilt für neue Abzeichnungen. Schon abgezeichnete Aufträge behalten ihre Unterschrift.</p>
+      </section>
       <section class="panel" id="adminPanel" aria-labelledby="h-adm" hidden>
         <div class="step"><h2 id="h-adm">Testkanal</h2><span class="chip info">Admin</span></div>
         <label class="check"><input type="checkbox" id="testChannel"> Testversionen vor allen anderen bekommen</label>
@@ -435,6 +441,7 @@ textarea:focus-visible{outline:2px solid var(--pen);outline-offset:2px}
       <section class="col" style="gap:8px">
         <strong>Abzeichnen</strong>
         <div id="pruefAbz" class="hint">Noch nicht abgezeichnet.</div>
+        <button type="button" class="link" id="paSigAendern" style="align-self:flex-start">Unterschrift ändern</button>
         <button type="button" class="primary" id="paSenden">Kontrolliert – abzeichnen</button>
       </section>
     </div>
@@ -681,20 +688,22 @@ $("#neuLaden").onclick = () => { monteureLaden(); if(mb.wahl) kwOeffnen(mb.wahl.
 // Berichte einer Woche nach Auftragsnummer bündeln; ohne Nummer über die Seriennummer zuordnen
 const normSer = s => String(s || "").toUpperCase().replace(/[^A-Z0-9]/g, "").replace(/O/g, "0").replace(/[IL]/g, "1");
 const normNr = s => String(s || "").trim().toUpperCase().replace(/\s+/g, "");
+// Nur eine echte Seriennummer (mind. 5 Ziffern) verbindet Berichte – der Typ allein („LPE250“) nicht
+const serOk = s => (normSer(s).match(/\d/g) || []).length >= 5;
 function gruppieren(berichte){
   const g = new Map(), serZuNr = new Map();
-  for(const b of berichte) if(normNr(b.nr) && normSer(b.serie).length >= 4) serZuNr.set(normSer(b.serie), normNr(b.nr));
+  for(const b of berichte) if(normNr(b.nr) && serOk(b.serie)) serZuNr.set(normSer(b.serie), normNr(b.nr));
   for(const b of berichte){
     let k = normNr(b.nr);
-    if(!k && normSer(b.serie).length >= 4) k = serZuNr.get(normSer(b.serie)) || "";
-    const key = k || "ohne:" + (normSer(b.serie) || b.id);
+    if(!k && serOk(b.serie)) k = serZuNr.get(normSer(b.serie)) || "";
+    const key = k || "ohne:" + (serOk(b.serie) ? normSer(b.serie) : b.id);
     if(!g.has(key)) g.set(key, {key, nr: k, serie: b.serie, berichte: []});
     g.get(key).berichte.push(b);
   }
   const liste = [...g.values()];
   for(const x of liste){
     x.berichte.sort((a, b) => (ART_ORDNUNG[a.art] ?? 9) - (ART_ORDNUNG[b.art] ?? 9) || normSer(a.serie).localeCompare(normSer(b.serie)) || a.eingang - b.eingang);
-    x.datei = x.nr ? x.nr : "ohne Auftragsnummer " + (x.serie ? x.serie : x.berichte[0].datei.replace(/\.pdf$/i, ""));
+    x.datei = x.nr ? x.nr : "ohne Auftragsnummer " + (serOk(x.serie) ? x.serie : x.berichte[0].datei.replace(/\.pdf$/i, ""));
     x.datum = x.berichte.map(b => b.datum).sort()[0] || "";
     x.ids = x.berichte.map(b => b.id).join(",");
   }
@@ -973,6 +982,22 @@ $("#pkSenden").onclick = async () => {
 $("#pqSetzen").onclick = async () => { if(await vermerkSenden("mb_klaerung", {aktion: "setzen", text: $("#pqText").value.trim()})) $("#pqText").value = ""; };
 $("#pqErledigt").onclick = () => vermerkSenden("mb_klaerung", {aktion: "erledigt"});
 $("#paSenden").onclick = abzeichnen;
+// Gespeicherte Unterschrift anzeigen, ändern, löschen
+async function unterschriftAnzeigen(){
+  const r = await (await fetch("/api/unterschrift")).json().catch(() => ({}));
+  $("#sigAnzeige").innerHTML = r.vorhanden ? `<img alt="Gespeicherte Unterschrift" src="data:image/png;base64,${r.b64}">` : '<span class="hint">Noch keine hinterlegt</span>';
+  $("#sigLoeschen2").hidden = !r.vorhanden;
+  $("#sigAendern").textContent = r.vorhanden ? "Ändern" : "Hinterlegen";
+}
+async function unterschriftAendern(){ if(await unterschriftHinterlegen()){ toast("Unterschrift gespeichert."); } unterschriftAnzeigen(); }
+$("#sigAendern").onclick = unterschriftAendern;
+$("#paSigAendern").onclick = unterschriftAendern;
+$("#sigLoeschen2").onclick = async () => {
+  if(!confirm("Gespeicherte Unterschrift auf diesem Computer löschen?")) return;
+  await fetch("/api/unterschrift", {method: "DELETE"}).catch(() => {});
+  unterschriftAnzeigen(); toast("Unterschrift gelöscht.");
+};
+unterschriftAnzeigen();
 $("#blockRetry").onclick = async () => {
   const r = await call("check");
   if(r.ok && !r.blocked){ state.blocked = false; persist(); $("#blockDlg").close(); toast("Zugang ist wieder freigegeben."); monteureLaden(); }
