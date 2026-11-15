@@ -15,8 +15,8 @@ Spalte „An Kundendienst senden (ja)“ ein `ja` haben (Admins immer). Der legt
 Die Kalenderwoche richtet sich nach dem Datum im Bericht (ISO-Woche).
 
 ## Wer darf das Programm benutzen?
-Anmeldung wie bei den anderen Programmen. Zusätzlich muss im Blatt „Nutzer Montageberichte“ in der
-Spalte „Berechtigt (ja)“ ein `ja` stehen (Admins dürfen immer).
+Jeder, der sich im Programm mit Namen und E-Mail anmeldet, darf die Berichte sehen (das Programm ist nur für
+die Dispo gedacht). Sperren: im Blatt „Nutzer Montageberichte“ in der Spalte „Gesperrt (ja)“ ein `ja` eintragen.
 
 ## Korrekturen und Abzeichnen
 Zu jedem Auftrag gibt es „✎ Prüfen“: Fehler in Text, Ersatzteilen oder Arbeitszeit werden als Korrektur

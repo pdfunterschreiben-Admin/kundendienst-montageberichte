@@ -343,7 +343,7 @@ button.burger .ic{width:20px;height:20px}
         <div class="row"><button type="button" id="sigAendern">Ändern</button><button type="button" class="ghost danger" id="sigLoeschen2" hidden>Löschen</button></div>
         <p class="hint">Gilt für neue Abzeichnungen. Schon abgezeichnete Aufträge behalten ihre Unterschrift.</p></details>
         <details class="m-teil m-fach" id="adminPanel" hidden><summary>Testkanal <span class="chip info">Admin</span></summary><label class="check"><input type="checkbox" id="testChannel"> Testversionen vor allen anderen bekommen</label>
-        <p class="hint">Wer die Montageberichte sehen darf: <button class="link" id="openSheet">Google-Tabelle öffnen</button> → Blatt „Nutzer Montageberichte“, Spalte „Berechtigt (ja)“.</p></details>
+        <p class="hint">Jemanden sperren: <button class="link" id="openSheet">Google-Tabelle öffnen</button> → Blatt „Nutzer Montageberichte“, Spalte „Gesperrt (ja)“.</p></details>
       </div>
     </div>
   </div>
@@ -401,7 +401,7 @@ button.burger .ic{width:20px;height:20px}
     <div class="dlg-head"><strong>Anleitung</strong><button class="ghost" value="x">Schließen</button></div>
     <div class="dlg-body help">
       <h3>Woher kommen die Berichte?</h3>
-      <p>Der Monteur klickt in der Service-Mappe bei „Berichte unterschreiben“ auf „An Kundendienst senden“ – dann landen seine unterschriebenen Berichte hier. Freigegeben wird das je Monteur in der Google-Tabelle, Blatt „Nutzer“, Spalte „An Kundendienst senden (ja)“. Wer die Montageberichte hier sehen darf, steht im Blatt „Nutzer Montageberichte“, Spalte „Berechtigt (ja)“. Die Kalenderwoche richtet sich nach dem Datum im Bericht.</p>
+      <p>Der Monteur klickt in der Service-Mappe bei „Berichte unterschreiben“ auf „An Kundendienst senden“ – dann landen seine unterschriebenen Berichte hier. Freigegeben wird das je Monteur in der Google-Tabelle, Blatt „Nutzer“, Spalte „An Kundendienst senden (ja)“. Die Kalenderwoche richtet sich nach dem Datum im Bericht.</p>
       <h3>Was ist zu tun? – „Zu prüfen“</h3>
       <ul>
         <li>Oben links steht <b>Zu prüfen</b> mit der Zahl aller Aufträge, die noch nicht abgezeichnet sind – von allen Monteuren, die ältesten zuerst. Einfach von oben nach unten abarbeiten.</li>
@@ -439,7 +439,7 @@ button.burger .ic{width:20px;height:20px}
   <form method="dialog" class="dlg" id="regForm">
     <div class="dlg-head"><strong>Einmalige Anmeldung</strong></div>
     <div class="dlg-body col" style="gap:12px">
-      <span class="hint">Einmal mit Namen und Arbeits-E-Mail anmelden. Die Montageberichte sieht nur, wen der Admin dafür freigegeben hat.</span>
+      <span class="hint">Einmal mit Namen und Arbeits-E-Mail anmelden. Danach kannst du die Montageberichte sofort sehen.</span>
       <label class="field">Vor- und Nachname
         <input type="text" id="regName" autocomplete="name" required placeholder="Max Mustermann">
       </label>
