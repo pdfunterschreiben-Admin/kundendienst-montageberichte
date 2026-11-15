@@ -253,6 +253,26 @@ textarea:focus-visible{outline:2px solid var(--pen);outline-offset:2px}
 #pruefDlg section button{align-self:flex-start}
 #pruefDlg #paSenden{align-self:stretch;justify-content:center;padding:9px 12px}
 #pruefKorr > div{padding:8px 10px;border-radius:6px;background:var(--row);color:var(--ink);font-size:13px}
+aside{display:flex;flex-direction:column}
+aside > .panel:first-child{flex:1;min-height:0;overflow:hidden;border-bottom:1px solid var(--line)}
+.liste-mont{display:flex;flex-direction:column;gap:1px;overflow:auto;min-height:0;margin:0 -8px;padding:0 8px}
+#montSuche{background:var(--paper)}
+.mont{display:flex;align-items:center;gap:8px;text-align:left}
+.mont .name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mont .pfeil{width:0;height:0;border-left:5px solid currentColor;border-top:4px solid transparent;border-bottom:4px solid transparent;opacity:.55;transition:transform .12s}
+.mont.auf .pfeil{transform:rotate(90deg)}
+.kws .mehr{align-self:flex-start;margin:4px 10px}
+details.fach{border-bottom:1px solid var(--line);padding:0 16px}
+details.fach summary{cursor:pointer;padding:12px 0;font-weight:600;font-size:13.5px;display:flex;align-items:center;gap:8px;list-style:none}
+details.fach summary::-webkit-details-marker{display:none}
+details.fach summary::after{content:"";margin-left:auto;width:7px;height:7px;border-right:1.5px solid var(--muted);border-bottom:1.5px solid var(--muted);transform:rotate(45deg);transition:transform .12s}
+details.fach[open] summary::after{transform:rotate(-135deg)}
+details.fach summary .hint{font-weight:400}
+details.fach > :not(summary){margin:0 0 10px}
+details.fach[open]{padding-bottom:6px}
+#sigAnzeige{height:64px}
+#sigAnzeige img{max-width:100%;max-height:100%;object-fit:contain}
+tr.klickbar{cursor:pointer}
 @media (max-width:960px){body{height:auto;overflow:auto}.grid{grid-template-columns:minmax(0,1fr)}aside{border-right:0}.appbar{height:auto;flex-wrap:wrap;padding:10px 14px}}
 </style>
 </head>
@@ -277,25 +297,26 @@ textarea:focus-visible{outline:2px solid var(--pen);outline-offset:2px}
     <aside>
       <section class="panel" aria-labelledby="h-mont">
         <div class="step"><h2 id="h-mont">Monteure</h2><button class="ghost" id="neuLaden" title="Liste neu laden" style="margin-left:auto"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9M13.5 2.5v3h-3"/></svg> Aktualisieren</button></div>
-        <div id="monteure" class="col" style="gap:6px"></div>
+        <input type="search" id="montSuche" placeholder="Monteur suchen" aria-label="Monteur suchen" hidden>
+        <div id="monteure" class="liste-mont"></div>
         <p class="hint" id="monteureInfo">Wird geladen …</p>
       </section>
-      <section class="panel" aria-labelledby="h-ablage">
-        <div class="step"><h2 id="h-ablage">Ablage</h2></div>
+      <details class="fach">
+        <summary>Ablage</summary>
         <p class="hint">Fertige PDFs liegen in</p><p class="pfad" id="ablagePfad">…</p>
         <button type="button" id="ablageBtn"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 4.5v8a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-6a1 1 0 0 0-1-1H8L6.5 3.5h-4a1 1 0 0 0-1 1z"/></svg> Ordner öffnen</button>
-      </section>
-      <section class="panel" aria-labelledby="h-sig">
-        <div class="step"><h2 id="h-sig">Meine Unterschrift</h2></div>
+      </details>
+      <details class="fach">
+        <summary>Meine Unterschrift <span class="hint" id="sigStatus"></span></summary>
         <div class="crop-prev" id="sigAnzeige" style="width:100%"><span class="hint">Noch keine hinterlegt</span></div>
         <div class="row"><button type="button" id="sigAendern">Ändern</button><button type="button" class="ghost danger" id="sigLoeschen2" hidden>Löschen</button></div>
         <p class="hint">Gilt für neue Abzeichnungen. Schon abgezeichnete Aufträge behalten ihre Unterschrift.</p>
-      </section>
-      <section class="panel" id="adminPanel" aria-labelledby="h-adm" hidden>
-        <div class="step"><h2 id="h-adm">Testkanal</h2><span class="chip info">Admin</span></div>
+      </details>
+      <details class="fach" id="adminPanel" hidden>
+        <summary>Testkanal <span class="chip info">Admin</span></summary>
         <label class="check"><input type="checkbox" id="testChannel"> Testversionen vor allen anderen bekommen</label>
         <p class="hint">Wer die Montageberichte sehen darf: <button class="link" id="openSheet">Google-Tabelle öffnen</button> → Blatt „Nutzer Montageberichte“, Spalte „Berechtigt (ja)“.</p>
-      </section>
+      </details>
     </aside>
 
     <main>
@@ -649,18 +670,25 @@ function unterschriftHinterlegen(){
   });
 }
 const kwText = k => `KW ${String(k.kw).padStart(2, "0")} / ${k.jahr}`;
+const KW_SICHTBAR = 6;
 function renderMonteure(){
   const box = $("#monteure"); box.innerHTML = "";
-  for(const m of mb.monteure){
+  const such = $("#montSuche"); such.hidden = mb.monteure.length < 8;
+  const q = such.hidden ? "" : such.value.trim().toLowerCase();
+  const liste = mb.monteure.filter(m => !q || m.name.toLowerCase().includes(q))
+    .sort((a, b) => a.name.localeCompare(b.name, "de"));
+  for(const m of liste){
     const auf = mb.offen === m.email;
     const b = document.createElement("button"); b.type = "button"; b.className = "mont" + (auf ? " auf" : "");
+    b.setAttribute("aria-expanded", auf);
     const summe = m.kws.reduce((s, k) => s + k.anzahl, 0);
-    b.innerHTML = `<span>${auf ? "▾" : "▸"} ${esc(m.name)}</span><span class="n">${summe}</span>`;
-    b.onclick = () => { mb.offen = auf ? "" : m.email; renderMonteure(); };
+    b.innerHTML = `<span class="pfeil" aria-hidden="true"></span><span class="name">${esc(m.name)}</span><span class="n" title="Berichte insgesamt">${summe}</span>`;
+    b.onclick = () => { mb.offen = auf ? "" : m.email; mb.alleKw = false; renderMonteure(); };
     box.appendChild(b);
     if(!auf) continue;
     const l = document.createElement("div"); l.className = "kws";
-    for(const k of m.kws){
+    const kws = mb.alleKw ? m.kws : m.kws.slice(0, KW_SICHTBAR);
+    for(const k of kws){
       const kb = document.createElement("button"); kb.type = "button";
       const gew = mb.wahl && mb.wahl.email === m.email && mb.wahl.jahr === k.jahr && mb.wahl.kw === k.kw;
       kb.className = "kw" + (gew ? " gew" : "");
@@ -668,9 +696,17 @@ function renderMonteure(){
       kb.onclick = () => kwOeffnen(m, k);
       l.appendChild(kb);
     }
+    if(m.kws.length > KW_SICHTBAR){
+      const mehr = document.createElement("button"); mehr.type = "button"; mehr.className = "link mehr";
+      mehr.textContent = mb.alleKw ? "Nur die letzten Wochen" : `Ältere Wochen anzeigen (${m.kws.length - KW_SICHTBAR})`;
+      mehr.onclick = () => { mb.alleKw = !mb.alleKw; renderMonteure(); };
+      l.appendChild(mehr);
+    }
     box.appendChild(l);
   }
+  if(q && !liste.length) box.innerHTML = '<p class="hint">Kein Monteur gefunden.</p>';
 }
+$("#montSuche").oninput = renderMonteure;
 async function monteureLaden(){
   if(locked()) return;
   $("#monteureInfo").hidden = false; $("#monteureInfo").textContent = "Wird geladen …";
@@ -704,9 +740,9 @@ function renderWoche(){
     tr.innerHTML = `<td class="nr">${g.nr ? esc(g.nr) : '<span class="hint">ohne Nummer</span>'}</td>
       <td class="inhalt"><div class="liste">${g.berichte.map((b, i) => `<span class="chip ${b.art}">${i + 1}. ${esc(ART_NAME[b.art] || b.art)}${b.serie ? ` <span class="ser">${esc(b.serie)}</span>` : ""}</span>`).join("")}</div></td>
       <td class="ort">${esc(datumDe(g.datum))}</td><td><div class="liste">${status}${chips}</div></td>
-      <td class="akt"><button type="button" ${ok ? "" : "disabled"}><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 1.5h5.5L13 5v9.5H4z"/><path d="M9.5 1.5V5H13"/></svg> Öffnen</button> <button type="button" class="pruefen primary"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5l3 3 7-7"/></svg> Prüfen</button></td>`;
-    tr.querySelector("button").onclick = () => pruefenOeffnen(g);
-    tr.querySelector(".pruefen").onclick = () => pruefenOeffnen(g);
+      <td class="akt"><button type="button" class="pruefen primary"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5l3 3 7-7"/></svg> Prüfen</button></td>`;
+    tr.className = "klickbar"; tr.title = "PDF ansehen und prüfen";
+    tr.onclick = () => pruefenOeffnen(g);
     tb.appendChild(tr);
   }
   if($("#pruefDlg").open) pruefPdfLaden();
@@ -963,6 +999,7 @@ async function unterschriftAnzeigen(){
   const r = await (await fetch("/api/unterschrift")).json().catch(() => ({}));
   $("#sigAnzeige").innerHTML = r.vorhanden ? `<img alt="Gespeicherte Unterschrift" src="data:image/png;base64,${r.b64}">` : '<span class="hint">Noch keine hinterlegt</span>';
   $("#sigLoeschen2").hidden = !r.vorhanden;
+  $("#sigStatus").textContent = r.vorhanden ? "hinterlegt" : "fehlt";
   $("#sigAendern").textContent = r.vorhanden ? "Ändern" : "Hinterlegen";
 }
 async function unterschriftAendern(){ if(await unterschriftHinterlegen()){ toast("Unterschrift gespeichert."); } unterschriftAnzeigen(); }
