@@ -12,8 +12,31 @@ const MB_BLATT = 'Montageberichte';
 const MB_HEAD = ['Eingang', 'Monteur', 'E-Mail', 'Berichtsdatum', 'Jahr', 'KW', 'Auftragsnummer', 'Art', 'Seriennummer', 'Dateiname', 'Datei-ID', 'Prüfsumme'];
 const MB_NUTZER = 'Nutzer Montageberichte';
 const MB_ARTEN = { montage: 'Montagebericht', uvv: 'UVV Bericht', dguv: 'DGUV V3 Bericht' };
-// Wer schon Berichte schicken darf: erstmal nur die Admins. Weitere E-Mails hier eintragen, '*' = alle Monteure.
+// Wer Berichte an den Kundendienst schicken darf (Schaltfläche „An Kundendienst senden“ in der Service-Mappe):
+// Admins immer, sonst wer im Blatt „Nutzer“ in der Spalte „An Kundendienst senden (ja)“ ein „ja“ hat.
+// Notfalls hier E-Mails eintragen, '*' = alle Monteure.
 const MB_FREI = [];
+const MB_FREI_SPALTE = 'An Kundendienst senden (ja)';
+
+function mbFreiSpalte(users) {
+  const lc = Math.max(users.getLastColumn(), 1);
+  const head = users.getRange(1, 1, 1, lc).getValues()[0].map(function (h) { return String(h).trim(); });
+  let c = head.indexOf(MB_FREI_SPALTE);
+  if (c < 0) { c = Math.max(lc, 12); users.getRange(1, c + 1).setValue(MB_FREI_SPALTE).setFontWeight('bold'); }
+  return c + 1;
+}
+
+function mbFreiFuer(mail, users) {
+  mail = String(mail || '').toLowerCase();
+  if (!mail) return false;
+  if (ADMIN_MAILS.indexOf(mail) >= 0 || MB_FREI.indexOf('*') >= 0 || MB_FREI.indexOf(mail) >= 0) return true;
+  users = users || SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Nutzer');
+  if (!users) return false;
+  const c = mbFreiSpalte(users), lr = users.getLastRow();
+  if (lr < 2) return false;
+  const mails = users.getRange(2, 2, lr - 1, 1).getValues(), frei = users.getRange(2, c, lr - 1, 1).getValues();
+  return mails.some(function (m, i) { return String(m[0]).trim().toLowerCase() === mail && String(frei[i][0]).trim().toLowerCase() === 'ja'; });
+}
 
 function mbBlatt(ss) {
   const s = sheet(ss || SpreadsheetApp.getActiveSpreadsheet(), MB_BLATT, MB_HEAD);
@@ -55,7 +78,7 @@ function mbHoch(d) {
   const mail = clean(d.email, 150).toLowerCase(), name = clean(d.name, 100);
   if (ADMIN_MAILS.indexOf(mail) < 0 && !mail.endsWith('@' + DOMAIN)) throw new Error('Nicht berechtigt.');
   if (!name) throw new Error('Name fehlt.');
-  if (ADMIN_MAILS.indexOf(mail) < 0 && MB_FREI.indexOf('*') < 0 && MB_FREI.indexOf(mail) < 0) return 'noch nicht freigegeben';
+  if (!mbFreiFuer(mail)) return 'noch nicht freigegeben';
   const b64 = String(d.b64 || '').replace(/\s/g, '');
   if (b64.length < 200 || b64.length > 40000000) throw new Error('Keine gültige PDF.');
   const bytes = Utilities.base64Decode(b64);

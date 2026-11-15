@@ -354,7 +354,7 @@ main{background:linear-gradient(color-mix(in srgb,var(--paper) 93%,transparent),
     <div class="dlg-head"><strong>Anleitung</strong><button class="ghost" value="x">Schließen</button></div>
     <div class="dlg-body help">
       <h3>Woher kommen die Berichte?</h3>
-      <p>Sobald ein Monteur in der Service-Mappe einen Bericht unterschreibt und speichert, druckt oder per E-Mail schickt, geht automatisch eine Kopie hierher. Die Kalenderwoche richtet sich nach dem Datum im Bericht.</p>
+      <p>Der Monteur klickt in der Service-Mappe bei „Berichte unterschreiben“ auf „📤 An Kundendienst senden“ – dann landen seine unterschriebenen Berichte hier. Freigegeben wird das je Monteur in der Google-Tabelle, Blatt „Nutzer“, Spalte „An Kundendienst senden (ja)“. Die Kalenderwoche richtet sich nach dem Datum im Bericht.</p>
       <h3>Monteur und Kalenderwoche</h3>
       <ul>
         <li>Links auf einen <b>Monteur</b> klicken – darunter stehen seine Kalenderwochen (die neueste oben).</li>
@@ -725,7 +725,7 @@ async function monteureLaden(){
   if(!r.ok){ $("#monteureInfo").textContent = r.error || "Konnte nicht geladen werden."; $("#monteureInfo").className = "err"; return; }
   $("#monteureInfo").className = "hint";
   mb.monteure = r.monteure || [];
-  $("#monteureInfo").textContent = mb.monteure.length ? "" : "Noch keine Berichte eingegangen. Sobald ein Monteur in der Service-Mappe einen Bericht unterschreibt, erscheint er hier.";
+  $("#monteureInfo").textContent = mb.monteure.length ? "" : "Noch keine Berichte eingegangen. Sobald ein Monteur in der Service-Mappe auf „An Kundendienst senden“ klickt, erscheinen seine Berichte hier.";
   $("#monteureInfo").hidden = !!mb.monteure.length;
   if(!mb.offen && mb.monteure.length === 1) mb.offen = mb.monteure[0].email;
   renderMonteure();

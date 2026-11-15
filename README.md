@@ -7,8 +7,10 @@ erst Montagebericht, dann UVV-Bericht, dann DGUV-V3-Bericht.
 Ablage: `Dokumente\Kundendienst Montageberichte\<Monteur>\<Jahr> KW <nn>\<Auftragsnummer>.pdf`
 
 ## Wie die Berichte ankommen
-Die Service-Mappe (ab 1.20.51) schickt jeden unterschriebenen Bericht beim Speichern, Drucken oder
-Mailen mit `mb_hoch` an den Anmeldeserver. Der legt die PDF in Google Drive unter
+In der Service-Mappe (ab 1.20.52) klickt der Monteur bei „Berichte unterschreiben“ auf
+„📤 An Kundendienst senden“; dann gehen die unterschriebenen Berichte mit `mb_hoch` an den Anmeldeserver.
+Die Schaltfläche (und der Hinweis beim Schließen) erscheint nur für Monteure, die im Blatt „Nutzer“ in der
+Spalte „An Kundendienst senden (ja)“ ein `ja` haben (Admins immer). Der legt die PDF in Google Drive unter
 „Kundendienst Montageberichte/<Monteur>“ ab und schreibt eine Zeile ins Blatt „Montageberichte“.
 Die Kalenderwoche richtet sich nach dem Datum im Bericht (ISO-Woche).
 
