@@ -86,14 +86,6 @@ func (a *app) handleMb(w http.ResponseWriter, r *http.Request) {
 }
 
 // Ablage: Dokumente\Kundendienst Montageberichte\<Monteur>\<Jahr> KW <nn>\<Auftrag>.pdf
-func ablageOrdner() string {
-	home, _ := os.UserHomeDir()
-	if p := os.Getenv("USERPROFILE"); p != "" {
-		home = p
-	}
-	return filepath.Join(home, "Documents", "Kundendienst Montageberichte")
-}
-
 var unerlaubt = regexp.MustCompile(`[\\/:*?"<>|\x00-\x1f]+`)
 
 func sauber(s string) string {
