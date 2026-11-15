@@ -137,6 +137,12 @@ td.akt{white-space:nowrap;width:1%;text-align:right}
 #toast{position:fixed;left:50%;transform:translateX(-50%);bottom:18px;background:var(--ink);color:var(--paper);padding:10px 16px;border-radius:8px;font-size:14px;max-width:min(560px,calc(100% - 32px));box-shadow:0 6px 20px rgba(0,0,0,.2);z-index:30;display:flex;gap:12px;align-items:center}
 #toast button{background:transparent;color:var(--paper);border-color:rgba(255,255,255,.4);padding:4px 10px;font-size:13px}
 dialog{border:0;border-radius:12px;padding:0;background:var(--sheet);color:var(--ink);width:min(460px,calc(100vw - 32px));max-height:calc(100vh - 32px);box-shadow:0 20px 60px rgba(0,0,0,.35)}
+#sigDlg{width:min(900px,96vw)}
+.crop{position:relative;margin:0 auto;max-width:100%;width:fit-content;cursor:crosshair;user-select:none;touch-action:none;background:#fff;border:1px solid var(--line)}
+.crop canvas{display:block;max-width:100%;max-height:56vh}
+.sel{position:absolute;border:2px solid var(--pen);background:rgba(31,79,168,.08);box-shadow:0 0 0 9999px rgba(10,15,30,.25);pointer-events:none}
+.crop-prev{height:70px;min-width:140px;border:1px solid var(--line);border-radius:6px;display:grid;place-items:center;padding:6px;background:repeating-conic-gradient(#e4e4e4 0 25%,#fff 0 50%) 0 0/14px 14px}
+.crop-prev img{max-height:100%;max-width:260px}
 #pruefDlg{width:min(1180px,96vw);height:min(86vh,900px);min-width:480px;min-height:340px;max-width:98vw;max-height:98vh;resize:both;overflow:hidden}
 #pruefDlg .dlg{height:100%;max-height:none}
 .pruef-grid{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(310px,1fr);flex:1;min-height:0}
@@ -383,7 +389,7 @@ textarea:focus-visible{outline:2px solid var(--pen);outline-offset:2px}
       <div id="sigFehler" class="chip bad" hidden style="white-space:normal"></div>
       <div id="sigQrTeil" class="col" style="gap:10px;align-items:center">
         <img id="sigQr" alt="QR-Code" width="220" height="220" style="image-rendering:pixelated;background:#fff;padding:8px;border-radius:8px">
-        <span class="hint">Unterschrift auf ein weißes Blatt schreiben, QR-Code mit dem Handy scannen und das Blatt fotografieren.</span>
+        <span class="hint">QR-Code mit dem Handy scannen und ein Blatt mit deiner Unterschrift fotografieren, zum Beispiel einen unterschriebenen Bericht. Danach hier einen Rahmen um die Unterschrift ziehen.</span>
         <button type="button" id="sigZeichnen">Stattdessen hier zeichnen</button>
       </div>
       <div id="sigZeichenTeil" class="col" style="gap:10px" hidden>
@@ -391,8 +397,12 @@ textarea:focus-visible{outline:2px solid var(--pen);outline-offset:2px}
         <div class="row" style="gap:8px"><button type="button" id="sigLoeschen">Löschen</button><button type="button" id="sigZurueck">Zurück zum QR-Code</button></div>
       </div>
       <div id="sigVorschauTeil" class="col" style="gap:10px" hidden>
-        <img id="sigVorschau" alt="Vorschau" style="max-width:100%;border:1px solid var(--line);border-radius:8px;background:repeating-conic-gradient(#ddd 0 25%,#fff 0 50%) 0 0/16px 16px">
-        <div class="row" style="gap:8px"><button type="button" class="primary" id="sigUebernehmen">Übernehmen</button><button type="button" id="sigNeu">Neues Foto</button></div>
+        <strong>Rahmen um die Unterschrift ziehen</strong>
+        <div class="crop" id="sigCrop"><canvas id="sigFoto"></canvas><div class="sel" id="sigSel" hidden></div></div>
+        <div class="row" style="justify-content:space-between">
+          <div class="row"><span class="hint">Vorschau:</span><div class="crop-prev" id="sigPrevBox"><span class="hint">–</span></div></div>
+          <div class="row" style="gap:8px"><button type="button" id="sigNeu">Neues Foto</button><button type="button" class="primary" id="sigUebernehmen" disabled>Übernehmen</button></div>
+        </div>
       </div>
       <button type="button" class="primary" id="sigZeichnenOk" hidden>Übernehmen</button>
     </div>
@@ -561,24 +571,46 @@ function unterschriftHinterlegen(){
       }
       if(aktiv) fehler("Der QR-Code ist abgelaufen – bitte das Fenster neu öffnen.");
     }
+    // Wie „aus PDF ausschneiden“ in der Service-Mappe: Foto zeigen, Rahmen ziehen, Papier wird durchsichtig
+    const fc = $("#sigFoto"), selEl = $("#sigSel"); let sel = null;
     async function fotoVerarbeiten(b64){
       try{
         const bin = atob(b64), u = new Uint8Array(bin.length);
         for(let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
         const bmp = await createImageBitmap(new Blob([u], {type: "image/jpeg"}));
-        const cv = document.createElement("canvas"); cv.width = bmp.width; cv.height = bmp.height;
-        const cx = cv.getContext("2d", {willReadFrequently: true}); cx.drawImage(bmp, 0, 0);
-        const d = cx.getImageData(0, 0, cv.width, cv.height);
-        const f = freistellen(d.data, d.width, d.height);
-        if(!f){ fehler("Keine Unterschrift erkannt – bitte noch einmal fotografieren."); return false; }
-        const q = document.createElement("canvas"); q.width = f.breite; q.height = f.hoehe;
-        q.getContext("2d").putImageData(new ImageData(new Uint8ClampedArray(f.pixel), f.breite, f.hoehe), 0, 0);
-        const m = Math.min(1, 600 / f.breite), z = document.createElement("canvas");
-        z.width = Math.max(1, Math.round(f.breite * m)); z.height = Math.max(1, Math.round(f.hoehe * m));
-        const zx = z.getContext("2d"); zx.imageSmoothingQuality = "high"; zx.drawImage(q, 0, 0, z.width, z.height);
-        png = z.toDataURL("image/png").split(",")[1];
-        $("#sigVorschau").src = "data:image/png;base64," + png; fehler(""); zeige("vorschau"); return true;
+        const m = Math.min(1, 2000 / Math.max(bmp.width, bmp.height));
+        fc.width = Math.round(bmp.width * m); fc.height = Math.round(bmp.height * m);
+        fc.getContext("2d", {willReadFrequently: true}).drawImage(bmp, 0, 0, fc.width, fc.height);
+        sel = null; selEl.hidden = true; png = ""; $("#sigUebernehmen").disabled = true;
+        $("#sigPrevBox").innerHTML = '<span class="hint">–</span>';
+        fehler(""); zeige("vorschau"); return true;
       }catch(e){ fehler("Das Foto konnte nicht gelesen werden – bitte noch einmal fotografieren."); return false; }
+    }
+    function ausschneiden(){
+      png = ""; $("#sigUebernehmen").disabled = true;
+      if(!sel || sel.w < 8 || sel.h < 8){ selEl.hidden = true; $("#sigPrevBox").innerHTML = '<span class="hint">–</span>'; return; }
+      const k = fc.width / fc.getBoundingClientRect().width;
+      const sx = Math.round(sel.x * k), sy = Math.round(sel.y * k), sw = Math.max(1, Math.round(sel.w * k)), sh = Math.max(1, Math.round(sel.h * k));
+      const d = fc.getContext("2d").getImageData(sx, sy, Math.min(sw, fc.width - sx), Math.min(sh, fc.height - sy));
+      const f = freistellen(d.data, d.width, d.height);
+      if(!f){ $("#sigPrevBox").innerHTML = '<span class="hint">Nichts erkannt</span>'; return; }
+      nurTinte(f.pixel);
+      const q = document.createElement("canvas"); q.width = f.breite; q.height = f.hoehe;
+      q.getContext("2d").putImageData(new ImageData(new Uint8ClampedArray(f.pixel), f.breite, f.hoehe), 0, 0);
+      const m = Math.min(1, 600 / f.breite), z = document.createElement("canvas");
+      z.width = Math.max(1, Math.round(f.breite * m)); z.height = Math.max(1, Math.round(f.hoehe * m));
+      const zx = z.getContext("2d"); zx.imageSmoothingQuality = "high"; zx.drawImage(q, 0, 0, z.width, z.height);
+      png = z.toDataURL("image/png").split(",")[1];
+      $("#sigPrevBox").innerHTML = `<img alt="Vorschau" src="data:image/png;base64,${png}">`;
+      $("#sigUebernehmen").disabled = false;
+    }
+    {
+      const box = $("#sigCrop"); let st = null;
+      const rel = e => { const r = fc.getBoundingClientRect(); return {x: Math.min(Math.max(0, e.clientX - r.left), r.width), y: Math.min(Math.max(0, e.clientY - r.top), r.height)}; };
+      const zeichne = () => { selEl.hidden = false; Object.assign(selEl.style, {left: sel.x + "px", top: sel.y + "px", width: sel.w + "px", height: sel.h + "px"}); };
+      box.onpointerdown = e => { box.setPointerCapture(e.pointerId); st = rel(e); sel = {x: st.x, y: st.y, w: 0, h: 0}; zeichne(); };
+      box.onpointermove = e => { if(!st) return; const p = rel(e); sel = {x: Math.min(st.x, p.x), y: Math.min(st.y, p.y), w: Math.abs(p.x - st.x), h: Math.abs(p.y - st.y)}; zeichne(); };
+      box.onpointerup = () => { if(!st) return; st = null; ausschneiden(); };
     }
     async function speichern(){
       fehler("");
@@ -601,7 +633,7 @@ function unterschriftHinterlegen(){
       if(!gemalt){ fehler("Bitte zuerst unterschreiben."); return; }
       png = cv.toDataURL("image/png").split(",")[1]; speichern();
     };
-    $("#sigUebernehmen").onclick = speichern;
+    $("#sigUebernehmen").onclick = () => { if(png) speichern(); };
     $("#sigNeu").onclick = () => { fehler(""); zeige("qr"); schleife(); };
     $("#sigZu").onclick = () => dlg.close();
     dlg.onclose = () => { stopp(); fertig(gespeichert); };
