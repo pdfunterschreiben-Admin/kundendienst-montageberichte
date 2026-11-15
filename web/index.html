@@ -305,6 +305,36 @@ td .chip{white-space:nowrap}
   </form>
 </dialog>
 
+<dialog id="pruefDlg">
+  <div class="dlg" style="width:min(560px,calc(100vw - 32px))">
+    <div class="dlg-head"><strong id="pruefTitel">Bericht prüfen</strong><button type="button" class="ghost" id="pruefZu">Schließen</button></div>
+    <div class="dlg-body col" style="gap:16px">
+      <div id="pruefFehler" class="chip bad" hidden style="white-space:normal"></div>
+      <section class="col" style="gap:8px">
+        <strong>Korrekturen</strong>
+        <div id="pruefKorr" class="hint">Noch keine Korrekturen.</div>
+        <div class="col" style="gap:8px">
+          <select id="pkBereich"><option>Text</option><option>Ersatzteile</option><option>Arbeitszeit</option><option>Sonstiges</option></select>
+          <input id="pkVorher" type="text" maxlength="500" placeholder="Im Bericht (falsch)">
+          <input id="pkNachher" type="text" maxlength="500" placeholder="Richtig ist">
+          <button type="button" id="pkSenden">Korrektur eintragen</button>
+        </div>
+      </section>
+      <section class="col" style="gap:8px">
+        <strong>Rückfrage</strong>
+        <div id="pruefKlaer" class="hint">Keine Rückfrage.</div>
+        <textarea id="pqText" rows="2" maxlength="1000" placeholder="Was ist unklar?"></textarea>
+        <div class="row" style="gap:8px"><button type="button" id="pqSetzen">Rückfrage setzen</button><button type="button" id="pqErledigt" hidden>Als geklärt markieren</button></div>
+      </section>
+      <section class="col" style="gap:8px">
+        <strong>Abzeichnen</strong>
+        <div id="pruefAbz" class="hint">Noch nicht abgezeichnet.</div>
+        <button type="button" class="primary" id="paSenden">Kontrolliert – abzeichnen</button>
+      </section>
+    </div>
+  </div>
+</dialog>
+
 <dialog id="blockDlg">
   <form method="dialog" class="dlg">
     <div class="dlg-head"><strong>Programm gesperrt</strong></div>
@@ -353,6 +383,46 @@ async function mbCall(event, extra = {}){
   try{
     return await (await fetch("/api/mb", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({event, ...extra})})).json();
   }catch(e){ return {ok: false, error: "Keine Verbindung zum Programm."}; }
+}
+// ---- Prüfen: Korrekturen, Rückfrage, Abzeichnen ----
+const zeitDe = t => new Date(t).toLocaleString("de-DE", {timeZone: "Europe/Berlin", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit"}).replace(",", "");
+let pruefG = null, pruefBusy = false;
+function pruefZeichnen(){
+  const g = pruefG; if(!g) return;
+  const st = standVon(g);
+  $("#pruefTitel").textContent = "Auftrag " + (g.nr || g.datei) + " prüfen";
+  $("#pruefKorr").innerHTML = st.korrekturen.length ? st.korrekturen.map(k =>
+    `<div style="margin-bottom:6px"><b>${esc(k.bereich)}</b> · ${esc(k.name)} · ${esc(zeitDe(k.t))}<br>Im Bericht: ${esc(k.vorher || "–")}<br>Richtig ist: ${esc(k.nachher)}</div>`).join("") : "Noch keine Korrekturen.";
+  const q = st.klaerung;
+  $("#pruefKlaer").textContent = !q ? "Keine Rückfrage." : (q.offen ? "Offen: " : "Geklärt: ") + q.text + " – " + (q.offen ? "gestellt von " : "geklärt von ") + q.name + ", " + zeitDe(q.t);
+  $("#pqErledigt").hidden = !(q && q.offen); $("#pqSetzen").hidden = !!(q && q.offen); $("#pqText").hidden = !!(q && q.offen);
+  $("#pruefAbz").textContent = st.abzeichnung ? "Abgezeichnet von " + st.abzeichnung.name + ", " + zeitDe(st.abzeichnung.t) : "Noch nicht abgezeichnet.";
+  $("#paSenden").hidden = !!st.abzeichnung;
+}
+function pruefSperren(an){ pruefBusy = an; document.querySelectorAll("#pruefDlg button, #pruefDlg select, #pruefDlg input, #pruefDlg textarea").forEach(e => { if(e.id !== "pruefZu") e.disabled = an; }); }
+function pruefenOeffnen(g){
+  pruefG = g; $("#pruefFehler").hidden = true;
+  ["#pkVorher", "#pkNachher", "#pqText"].forEach(i => $(i).value = "");
+  pruefZeichnen(); $("#pruefDlg").showModal();
+}
+async function vermerkSenden(ereignis, extra = {}){
+  const w = mb.wahl, g = pruefG; if(!w || !g || pruefBusy) return false;
+  pruefSperren(true); $("#pruefFehler").hidden = true;
+  const r = await mbCall(ereignis, {monteur: w.email, jahr: w.jahr, kw: w.kw, auftrag: g.datei, ...extra});
+  pruefSperren(false);
+  if(!r.ok){ $("#pruefFehler").textContent = serverHinweis(r); $("#pruefFehler").hidden = false; return false; }
+  mb.vermerke[g.datei] = r.stand; pruefZeichnen(); renderWoche(); erstellen();
+  return true;
+}
+async function abzeichnen(){
+  if(pruefBusy) return;
+  let r = await (await fetch("/api/unterschrift")).json().catch(() => ({}));
+  if(!r.vorhanden){
+    if(!(await unterschriftHinterlegen())) return;
+    r = await (await fetch("/api/unterschrift")).json().catch(() => ({}));
+    if(!r.vorhanden) return;
+  }
+  if(await vermerkSenden("mb_abzeichnen", {unterschrift: r.b64})) toast("Abgezeichnet.");
 }
 const kwText = k => `KW ${String(k.kw).padStart(2, "0")} / ${k.jahr}`;
 function renderMonteure(){
@@ -432,8 +502,9 @@ function renderWoche(){
     tr.innerHTML = `<td class="nr">${g.nr ? esc(g.nr) : '<span class="hint">ohne Nummer</span>'}</td>
       <td class="inhalt"><div class="liste">${g.berichte.map((b, i) => `<span class="chip ${b.art}">${i + 1}. ${esc(ART_NAME[b.art] || b.art)}${b.serie ? ` <span class="ser">${esc(b.serie)}</span>` : ""}</span>`).join("")}</div></td>
       <td class="ort">${esc(datumDe(g.datum))}</td><td><div class="liste">${status}${chips}</div></td>
-      <td class="akt"><button type="button" ${ok ? "" : "disabled"}>📄 Öffnen</button></td>`;
+      <td class="akt"><button type="button" ${ok ? "" : "disabled"}>📄 Öffnen</button> <button type="button" class="pruefen">✎ Prüfen</button></td>`;
     tr.querySelector("button").onclick = () => zeigen({datei: g.datei});
+    tr.querySelector(".pruefen").onclick = () => pruefenOeffnen(g);
     tb.appendChild(tr);
   }
 }
@@ -675,6 +746,13 @@ $("#codeForm").addEventListener("submit", async e => {
   $("#codeDlg").close();
   if(state.blocked) $("#blockDlg").showModal(); else { toast("Freigeschaltet."); angemeldetWechsel(); }
 });
+$("#pruefZu").onclick = () => $("#pruefDlg").close();
+$("#pkSenden").onclick = async () => {
+  if(await vermerkSenden("mb_korrektur", {bereich: $("#pkBereich").value, vorher: $("#pkVorher").value.trim(), nachher: $("#pkNachher").value.trim()})){ $("#pkVorher").value = ""; $("#pkNachher").value = ""; }
+};
+$("#pqSetzen").onclick = async () => { if(await vermerkSenden("mb_klaerung", {aktion: "setzen", text: $("#pqText").value.trim()})) $("#pqText").value = ""; };
+$("#pqErledigt").onclick = () => vermerkSenden("mb_klaerung", {aktion: "erledigt"});
+$("#paSenden").onclick = abzeichnen;
 $("#blockRetry").onclick = async () => {
   const r = await call("check");
   if(r.ok && !r.blocked){ state.blocked = false; persist(); $("#blockDlg").close(); toast("Zugang ist wieder freigegeben."); monteureLaden(); }
