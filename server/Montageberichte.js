@@ -99,7 +99,7 @@ function mbNutzer(ss, d) {
   if (String(r[7]).trim().toLowerCase() === 'ja') throw new Error('Dein Zugang wurde gesperrt.');
   if (ADMIN_MAILS.indexOf(mail) < 0 && String(r[12]).trim().toLowerCase() !== 'ja')
     throw new Error('Du bist noch nicht für die Montageberichte freigegeben. Bitte beim Admin melden (Blatt „Nutzer Montageberichte“, Spalte „Berechtigt (ja)“).');
-  return mail;
+  return { mail: mail, name: String(r[0] || '') };
 }
 
 function mbZeilen() {
@@ -109,9 +109,20 @@ function mbZeilen() {
 
 function montageberichteAnfrage(d) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  mbNutzer(ss, d);
+  const nutzer = mbNutzer(ss, d);
   const ev = String(d.event || '');
+  if (/^mb_(vermerke|korrektur|klaerung|abzeichnen|unterschrift_datei)$/.test(ev)) {
+    const schreiben = /^mb_(korrektur|klaerung|abzeichnen)$/.test(ev);
+    const sperre = schreiben ? LockService.getScriptLock() : null;
+    if (sperre) sperre.waitLock(20000);
+    try { return mbVermerkAnfrage(ev, d, nutzer, mbAblage(ss), Date.now()); }
+    finally { if (sperre) sperre.releaseLock(); }
+  }
   const tz = Session.getScriptTimeZone() || 'Europe/Berlin';
+  if (ev === 'mb_unterschrift_code')
+    return mbSigCode(nutzer, CacheService.getScriptCache(), function () { return Utilities.getUuid().replace(/-/g, '').slice(0, 24); },
+      MB_HANDY_URL, function (link) { return qrBmpBase64(link, 6); });
+  if (ev === 'mb_unterschrift_abholen') return mbSigAbholen(d.token, nutzer, CacheService.getScriptCache());
   if (ev === 'mb_monteure') {
     // je Monteur (E-Mail) der neueste Name und alle Kalenderwochen mit Anzahl Berichten
     const m = {};
@@ -150,4 +161,182 @@ function montageberichteAnfrage(d) {
   return { ok: false, error: 'Unbekannte Anfrage.' };
 }
 
-if (typeof module !== 'undefined') module.exports = { mbKw, mbDatum };
+// ---------------- Korrekturen, Rückfragen und Abzeichnung ----------------
+// Der Verlauf liegt im Blatt „Korrekturen Montageberichte“ (nur anhängen). Der Stand eines Auftrags wird daraus berechnet.
+const MB_BEREICHE = ['Text', 'Ersatzteile', 'Arbeitszeit', 'Sonstiges'];
+
+// ereignisse: [{t, ereignis, bereich, vorher, nachher, text, name, mail, unterschriftId}] in Zeilenreihenfolge
+function mbStand(ereignisse) {
+  const korrekturen = [];
+  let klaerung = null, abzeichnung = null;
+  ereignisse.forEach(function (e) {
+    if (e.ereignis === 'korrektur') {
+      korrekturen.push({ t: e.t, bereich: e.bereich, vorher: e.vorher, nachher: e.nachher, name: e.name });
+      abzeichnung = null;
+    } else if (e.ereignis === 'klaerung_setzen') {
+      klaerung = { offen: true, text: e.text, name: e.name, t: e.t };
+      abzeichnung = null;
+    } else if (e.ereignis === 'klaerung_erledigt') {
+      klaerung = { offen: false, text: klaerung ? klaerung.text : '', name: e.name, t: e.t };
+    } else if (e.ereignis === 'abzeichnung') {
+      abzeichnung = { name: e.name, t: e.t, unterschriftId: e.unterschriftId };
+    }
+  });
+  const letzte = ereignisse.length ? ereignisse[ereignisse.length - 1].t : 0;
+  return { korrekturen: korrekturen, klaerung: klaerung, abzeichnung: abzeichnung, schluessel: ereignisse.length + ':' + letzte };
+}
+
+// Gibt den Fehlertext zurück oder null, wenn das Ereignis eingetragen werden darf.
+function mbVermerkPruefen(ereignis, daten, stand) {
+  const txt = function (v) { return String(v == null ? '' : v).trim(); };
+  if (ereignis === 'korrektur') {
+    if (MB_BEREICHE.indexOf(daten.bereich) < 0) return 'Unbekannter Bereich.';
+    if (!txt(daten.nachher)) return 'Bitte angeben, was richtig ist.';
+    if (txt(daten.vorher).length > 500 || txt(daten.nachher).length > 500 || txt(daten.text).length > 1000) return 'Text zu lang.';
+    return null;
+  }
+  if (ereignis === 'klaerung_setzen') {
+    if (!txt(daten.text)) return 'Bitte die Rückfrage beschreiben.';
+    if (txt(daten.text).length > 1000) return 'Text zu lang.';
+    return null;
+  }
+  if (ereignis === 'klaerung_erledigt') return stand.klaerung && stand.klaerung.offen ? null : 'Es ist keine Rückfrage offen.';
+  if (ereignis === 'abzeichnung') {
+    if (stand.klaerung && stand.klaerung.offen) return 'Rückfrage noch offen – erst als geklärt markieren.';
+    if (stand.abzeichnung) return 'Schon abgezeichnet.';
+    return null;
+  }
+  return 'Unbekannte Anfrage.';
+}
+
+// Blatt „Korrekturen Montageberichte“ und Drive-Ordner „Unterschriften“ als Ablage für mbVermerkAnfrage
+const MB_KORR_BLATT = 'Korrekturen Montageberichte';
+const MB_KORR_HEAD = ['Zeitpunkt', 'Ereignis', 'Monteur-E-Mail', 'Jahr', 'KW', 'Auftrag', 'Bereich', 'Vorher', 'Nachher', 'Text', 'Name', 'E-Mail', 'Unterschrift-ID', 'Prüfsumme'];
+
+// Texte, die wie Zahlen oder Formeln aussehen, mit führendem ' als Text ablegen (wie die Auftragsnummer in mbHoch)
+function mbZelle(v) { const t = String(v == null ? '' : v); return /^[\d=+\-@']/.test(t) ? "'" + t : t; }
+
+function mbAblage(ss) {
+  const s = sheet(ss, MB_KORR_BLATT, MB_KORR_HEAD);
+  const text = function (v) { return String(v == null ? '' : v); };
+  const ablage = {
+    zeilen: function () {
+      const last = s.getLastRow();
+      if (last < 2) return [];
+      return s.getRange(2, 1, last - 1, MB_KORR_HEAD.length).getValues().map(function (r) {
+        return { t: r[0] instanceof Date ? r[0].getTime() : Number(r[0]) || 0, ereignis: text(r[1]), monteur: text(r[2]), jahr: Number(r[3]), kw: Number(r[4]),
+          auftrag: text(r[5]), bereich: text(r[6]), vorher: text(r[7]), nachher: text(r[8]), text: text(r[9]), name: text(r[10]), mail: text(r[11]),
+          unterschriftId: text(r[12]), pruefsumme: text(r[13]) };
+      });
+    },
+    anhaengen: function (z) {
+      s.appendRow([new Date(z.t), z.ereignis, z.monteur, z.jahr, z.kw, mbZelle(z.auftrag), z.bereich, mbZelle(z.vorher), mbZelle(z.nachher), mbZelle(z.text),
+        z.name, z.mail, z.unterschriftId, z.pruefsumme]);
+    },
+    unterschriftSpeichern: function (mail, b64) {
+      const bytes = Utilities.base64Decode(b64);
+      const sha = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, bytes)
+        .map(function (b) { return ('0' + (b & 255).toString(16)).slice(-2); }).join('');
+      const da = ablage.zeilen().filter(function (z) { return z.mail === mail && z.pruefsumme === sha && z.unterschriftId; })[0];
+      if (da) return { id: da.unterschriftId, pruefsumme: sha };
+      const f = mbOrdner('Unterschriften').createFile(Utilities.newBlob(bytes, 'image/png', mail + '-' + Date.now() + '.png'));
+      return { id: f.getId(), pruefsumme: sha };
+    },
+    unterschriftLesen: function (id) { return Utilities.base64Encode(DriveApp.getFileById(id).getBlob().getBytes()); },
+  };
+  return ablage;
+}
+
+// ---------------- Unterschrift per Handy (QR-Code) ----------------
+// Vorbild: „Typenschild per Handy“ der Service-Mappe. Die Handy-Seite liegt auf GitHub Pages (docs/handy in diesem Repository)
+// und schickt das Foto per doPost (Ereignis h_sig, ohne Anmeldung, nur mit gültigem Code). Das Foto liegt nur im Skript-Cache.
+const MB_HANDY_URL = 'https://pdfunterschreiben-admin.github.io/kundendienst-montageberichte/handy/';
+const MB_SIG_TTL = 600;      // Sekunden, die der Code gilt
+const MB_SIG_MAX = 90000;    // Zeichen Base64 für das Foto (Cache-Werte dürfen höchstens 100 KB groß sein)
+
+function mbSigToken(token) {
+  const t = String(token == null ? '' : token).replace(/[^a-f0-9]/g, '');
+  return /^[a-f0-9]{24}$/.test(t) ? t : '';
+}
+
+function mbSigCode(nutzer, cache, zufall, handyUrl, qr) {
+  const token = zufall();
+  cache.put('sig_' + token, JSON.stringify({ mail: nutzer.mail, b64: null }), MB_SIG_TTL);
+  const link = handyUrl + '?sig=' + token;
+  return { ok: true, token: token, link: link, qr: qr(link) };
+}
+
+// Von der Handy-Seite: '1'/'0' bei aktion 'pruefen', '1' bei 'hochladen'; Fehler als Error (doPost macht daraus „FEHLER“)
+function mbSigHandy(d, cache) {
+  const token = mbSigToken(d.token);
+  const roh = token ? cache.get('sig_' + token) : null;
+  const eintrag = roh ? JSON.parse(roh) : null;
+  if (d.aktion === 'pruefen') return eintrag && eintrag.b64 === null ? '1' : '0';
+  if (d.aktion !== 'hochladen') throw new Error('Unbekannte Anfrage.');
+  if (!eintrag) throw new Error('Der QR-Code ist abgelaufen. Bitte im Programm noch einmal „Unterschrift hinterlegen“ wählen.');
+  if (eintrag.b64 !== null) throw new Error('Für diesen QR-Code wurde schon ein Foto geschickt.');
+  const b64 = String(d.b64 || '').replace(/\s/g, '');
+  if (b64.length < 100 || (b64.indexOf('/9j/') !== 0 && b64.indexOf('iVBOR') !== 0)) throw new Error('Kein Foto.');
+  if (b64.length > MB_SIG_MAX) throw new Error('Foto zu groß.');
+  eintrag.b64 = b64;
+  cache.put('sig_' + token, JSON.stringify(eintrag), MB_SIG_TTL);
+  return '1';
+}
+
+// Vom Büro-Programm: Foto abholen (nur der Nutzer, dem der Code gehört); nach der Ausgabe ist es gelöscht
+function mbSigAbholen(token, nutzer, cache) {
+  const t = mbSigToken(token);
+  const roh = t ? cache.get('sig_' + t) : null;
+  const eintrag = roh ? JSON.parse(roh) : null;
+  if (!eintrag || eintrag.mail !== nutzer.mail) return { ok: false, error: 'Code ungültig oder abgelaufen.' };
+  if (eintrag.b64 === null) return { ok: true, wartet: true };
+  cache.remove('sig_' + t);
+  return { ok: true, b64: eintrag.b64 };
+}
+
+// Aus Code.gs aufrufbar (siehe docs/server-einspielen.md)
+function mbHandySig(d) { return mbSigHandy(d, CacheService.getScriptCache()); }
+
+// Anfragen des Büro-Programms zu Vermerken. ablage: {zeilen(), anhaengen(zeile), unterschriftSpeichern(mail, b64), unterschriftLesen(id)}
+function mbVermerkAnfrage(ev, d, nutzer, ablage, jetzt) {
+  const txt = function (v, max) { return String(v == null ? '' : v).trim().slice(0, max); };
+  const monteur = txt(d.monteur, 150).toLowerCase(), jahr = Number(d.jahr), kw = Number(d.kw);
+  const meine = function () {
+    return ablage.zeilen().filter(function (z) { return String(z.monteur).toLowerCase() === monteur && Number(z.jahr) === jahr && Number(z.kw) === kw; });
+  };
+  if (ev === 'mb_vermerke') {
+    const gruppen = Object.create(null), vermerke = Object.create(null);
+    meine().forEach(function (z) { (gruppen[z.auftrag] = gruppen[z.auftrag] || []).push(z); });
+    Object.keys(gruppen).forEach(function (a) { vermerke[a] = mbStand(gruppen[a]); });
+    return { ok: true, vermerke: vermerke };
+  }
+  if (ev === 'mb_unterschrift_datei') {
+    const id = txt(d.datei, 100);
+    const bekannt = id && ablage.zeilen().some(function (z) { return z.ereignis === 'abzeichnung' && z.unterschriftId === id; });
+    return bekannt ? { ok: true, b64: ablage.unterschriftLesen(id) } : { ok: false, error: 'Unterschrift nicht gefunden.' };
+  }
+  let ereignis;
+  if (ev === 'mb_korrektur') ereignis = 'korrektur';
+  else if (ev === 'mb_abzeichnen') ereignis = 'abzeichnung';
+  else if (ev === 'mb_klaerung') ereignis = d.aktion === 'setzen' ? 'klaerung_setzen' : d.aktion === 'erledigt' ? 'klaerung_erledigt' : '';
+  if (!ereignis) return { ok: false, error: 'Unbekannte Anfrage.' };
+  const auftrag = txt(d.auftrag, 200);
+  if (!monteur || !auftrag) return { ok: false, error: 'Auftrag fehlt.' };
+  const daten = { bereich: txt(d.bereich, 40), vorher: txt(d.vorher, 2000), nachher: txt(d.nachher, 2000), text: txt(d.text, 2000) };
+  const stand = function () { return mbStand(meine().filter(function (z) { return z.auftrag === auftrag; })); };
+  const fehler = mbVermerkPruefen(ereignis, daten, stand());
+  if (fehler) return { ok: false, error: fehler };
+  const zeile = { t: jetzt, ereignis: ereignis, monteur: monteur, jahr: jahr, kw: kw, auftrag: auftrag, bereich: daten.bereich,
+    vorher: daten.vorher, nachher: daten.nachher, text: daten.text, name: nutzer.name, mail: nutzer.mail, unterschriftId: '', pruefsumme: '' };
+  if (ereignis === 'abzeichnung') {
+    const u = String(d.unterschrift || '').replace(/\s/g, '');
+    if (!u) return { ok: false, error: 'Bitte zuerst die Unterschrift hinterlegen.' };
+    if (u.length < 20 || u.length > 200000 || u.indexOf('iVBOR') !== 0) return { ok: false, error: 'Unterschrift ungültig.' };
+    const f = ablage.unterschriftSpeichern(nutzer.mail, u);
+    zeile.unterschriftId = f.id; zeile.pruefsumme = f.pruefsumme;
+  }
+  ablage.anhaengen(zeile);
+  return { ok: true, stand: stand() };
+}
+
+if (typeof module !== 'undefined') module.exports = { mbKw, mbDatum, MB_BEREICHE, mbStand, mbVermerkPruefen, mbVermerkAnfrage, MB_HANDY_URL, mbSigCode, mbSigHandy, mbSigAbholen };

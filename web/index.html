@@ -171,7 +171,7 @@ dialog::backdrop{background:rgba(10,15,30,.55)}
 .kw{justify-content:space-between;width:100%;padding:6px 10px;font-size:14px}
 .kw.gew{border-color:var(--pen);background:var(--pen);color:#fff}
 .kw.gew .hint{color:#fff;opacity:.85}
-td.inhalt .liste{display:flex;flex-wrap:wrap;gap:6px}
+td .liste{display:flex;flex-wrap:wrap;gap:6px}
 td .chip{white-space:nowrap}
 #ablagePfad{word-break:break-all}
 .chip.montage{background:var(--pen-soft);color:var(--pen)}
@@ -305,6 +305,59 @@ td .chip{white-space:nowrap}
   </form>
 </dialog>
 
+<dialog id="sigDlg">
+  <div class="dlg">
+    <div class="dlg-head"><strong>Unterschrift hinterlegen</strong><button type="button" class="ghost" id="sigZu">Abbrechen</button></div>
+    <div class="dlg-body col" style="gap:12px">
+      <div id="sigFehler" class="chip bad" hidden style="white-space:normal"></div>
+      <div id="sigQrTeil" class="col" style="gap:10px;align-items:center">
+        <img id="sigQr" alt="QR-Code" width="220" height="220" style="image-rendering:pixelated;background:#fff;padding:8px;border-radius:8px">
+        <span class="hint">Unterschrift auf ein weißes Blatt schreiben, QR-Code mit dem Handy scannen und das Blatt fotografieren.</span>
+        <button type="button" id="sigZeichnen">Stattdessen hier zeichnen</button>
+      </div>
+      <div id="sigZeichenTeil" class="col" style="gap:10px" hidden>
+        <canvas id="sigCanvas" width="500" height="200" style="width:100%;touch-action:none;border:1px solid var(--line);border-radius:8px;background:#fff"></canvas>
+        <div class="row" style="gap:8px"><button type="button" id="sigLoeschen">Löschen</button><button type="button" id="sigZurueck">Zurück zum QR-Code</button></div>
+      </div>
+      <div id="sigVorschauTeil" class="col" style="gap:10px" hidden>
+        <img id="sigVorschau" alt="Vorschau" style="max-width:100%;border:1px solid var(--line);border-radius:8px;background:repeating-conic-gradient(#ddd 0 25%,#fff 0 50%) 0 0/16px 16px">
+        <div class="row" style="gap:8px"><button type="button" class="primary" id="sigUebernehmen">Übernehmen</button><button type="button" id="sigNeu">Neues Foto</button></div>
+      </div>
+      <button type="button" class="primary" id="sigZeichnenOk" hidden>Übernehmen</button>
+    </div>
+  </div>
+</dialog>
+
+<dialog id="pruefDlg">
+  <div class="dlg" style="width:min(560px,calc(100vw - 32px))">
+    <div class="dlg-head"><strong id="pruefTitel">Bericht prüfen</strong><button type="button" class="ghost" id="pruefZu">Schließen</button></div>
+    <div class="dlg-body col" style="gap:16px">
+      <div id="pruefFehler" class="chip bad" hidden style="white-space:normal"></div>
+      <section class="col" style="gap:8px">
+        <strong>Korrekturen</strong>
+        <div id="pruefKorr" class="hint">Noch keine Korrekturen.</div>
+        <div class="col" style="gap:8px">
+          <select id="pkBereich"><option>Text</option><option>Ersatzteile</option><option>Arbeitszeit</option><option>Sonstiges</option></select>
+          <input id="pkVorher" type="text" maxlength="500" placeholder="Im Bericht (falsch)">
+          <input id="pkNachher" type="text" maxlength="500" placeholder="Richtig ist">
+          <button type="button" id="pkSenden">Korrektur eintragen</button>
+        </div>
+      </section>
+      <section class="col" style="gap:8px">
+        <strong>Rückfrage</strong>
+        <div id="pruefKlaer" class="hint">Keine Rückfrage.</div>
+        <textarea id="pqText" rows="2" maxlength="1000" placeholder="Was ist unklar?"></textarea>
+        <div class="row" style="gap:8px"><button type="button" id="pqSetzen">Rückfrage setzen</button><button type="button" id="pqErledigt" hidden>Als geklärt markieren</button></div>
+      </section>
+      <section class="col" style="gap:8px">
+        <strong>Abzeichnen</strong>
+        <div id="pruefAbz" class="hint">Noch nicht abgezeichnet.</div>
+        <button type="button" class="primary" id="paSenden">Kontrolliert – abzeichnen</button>
+      </section>
+    </div>
+  </div>
+</dialog>
+
 <dialog id="blockDlg">
   <form method="dialog" class="dlg">
     <div class="dlg-head"><strong>Programm gesperrt</strong></div>
@@ -316,6 +369,8 @@ td .chip{white-space:nowrap}
 <div id="toast" role="status" aria-live="polite" hidden><span id="toastText"></span><button type="button" id="toastBtn" hidden></button></div>
 
 <script src="/lib/pdf-lib.min.js"></script>
+<script src="/signatur.js"></script>
+<script src="/pruefseite.js"></script>
 <script>
 (() => {
 const $ = s => document.querySelector(s);
@@ -346,11 +401,128 @@ $("#helpBtn").onclick = () => $("#helpDlg").showModal();
 /* ---------- Montageberichte ---------- */
 const ART_NAME = {montage: "Montagebericht", uvv: "UVV Bericht", dguv: "DGUV V3 Bericht"};
 const ART_ORDNUNG = {montage: 0, uvv: 1, dguv: 2};
-const mb = {monteure: [], offen: "", wahl: null, gruppen: [], laeuft: 0, cache: new Map()};
+const mb = {monteure: [], offen: "", wahl: null, gruppen: [], laeuft: 0, cache: new Map(), vermerke: {}, hinweis: "", sigCache: new Map()};
 async function mbCall(event, extra = {}){
   try{
     return await (await fetch("/api/mb", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({event, ...extra})})).json();
   }catch(e){ return {ok: false, error: "Keine Verbindung zum Programm."}; }
+}
+// ---- Prüfen: Korrekturen, Rückfrage, Abzeichnen ----
+const zeitDe = t => new Date(t).toLocaleString("de-DE", {timeZone: "Europe/Berlin", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit"}).replace(",", "");
+let pruefG = null, pruefBusy = false;
+function pruefZeichnen(){
+  const g = pruefG; if(!g) return;
+  const st = standVon(g);
+  $("#pruefTitel").textContent = "Auftrag " + (g.nr || g.datei) + " prüfen";
+  $("#pruefKorr").innerHTML = st.korrekturen.length ? st.korrekturen.map(k =>
+    `<div style="margin-bottom:6px"><b>${esc(k.bereich)}</b> · ${esc(k.name)} · ${esc(zeitDe(k.t))}<br>Im Bericht: ${esc(k.vorher || "–")}<br>Richtig ist: ${esc(k.nachher)}</div>`).join("") : "Noch keine Korrekturen.";
+  const q = st.klaerung;
+  $("#pruefKlaer").textContent = !q ? "Keine Rückfrage." : (q.offen ? "Offen: " : "Geklärt: ") + q.text + " – " + (q.offen ? "gestellt von " : "geklärt von ") + q.name + ", " + zeitDe(q.t);
+  $("#pqErledigt").hidden = !(q && q.offen); $("#pqSetzen").hidden = !!(q && q.offen); $("#pqText").hidden = !!(q && q.offen);
+  $("#pruefAbz").textContent = st.abzeichnung ? "Abgezeichnet von " + st.abzeichnung.name + ", " + zeitDe(st.abzeichnung.t) : "Noch nicht abgezeichnet.";
+  $("#paSenden").hidden = !!st.abzeichnung;
+}
+function pruefSperren(an){ pruefBusy = an; document.querySelectorAll("#pruefDlg button, #pruefDlg select, #pruefDlg input, #pruefDlg textarea").forEach(e => { if(e.id !== "pruefZu") e.disabled = an; }); }
+function pruefenOeffnen(g){
+  pruefG = g; $("#pruefFehler").hidden = true;
+  ["#pkVorher", "#pkNachher", "#pqText"].forEach(i => $(i).value = "");
+  pruefZeichnen(); $("#pruefDlg").showModal();
+}
+async function vermerkSenden(ereignis, extra = {}){
+  const w = mb.wahl, g = pruefG; if(!w || !g || pruefBusy) return false;
+  pruefSperren(true); $("#pruefFehler").hidden = true;
+  const r = await mbCall(ereignis, {monteur: w.email, jahr: w.jahr, kw: w.kw, auftrag: g.datei, ...extra});
+  pruefSperren(false);
+  if(!r.ok){ $("#pruefFehler").textContent = serverHinweis(r); $("#pruefFehler").hidden = false; return false; }
+  mb.vermerke[g.datei] = r.stand; pruefZeichnen(); renderWoche(); erstellen();
+  return true;
+}
+async function abzeichnen(){
+  if(pruefBusy) return;
+  let r = await (await fetch("/api/unterschrift")).json().catch(() => ({}));
+  if(!r.vorhanden){
+    if(!(await unterschriftHinterlegen())) return;
+    r = await (await fetch("/api/unterschrift")).json().catch(() => ({}));
+    if(!r.vorhanden) return;
+  }
+  if(await vermerkSenden("mb_abzeichnen", {unterschrift: r.b64})) toast("Abgezeichnet.");
+}
+// ---- Unterschrift hinterlegen: QR-Code → Foto vom Handy (oder Zeichnen) ----
+function unterschriftHinterlegen(){
+  return new Promise(fertig => {
+    const dlg = $("#sigDlg"); let aktiv = true, png = "", gespeichert = false, zeichnet = false, gemalt = false;
+    const teile = {qr: "#sigQrTeil", zeichnen: "#sigZeichenTeil", vorschau: "#sigVorschauTeil"};
+    const zeige = t => { for(const k in teile) $(teile[k]).hidden = k !== t; $("#sigZeichnenOk").hidden = t !== "zeichnen"; };
+    const fehler = m => { $("#sigFehler").textContent = m || ""; $("#sigFehler").hidden = !m; };
+    const stopp = () => { aktiv = false; };
+    const warte = ms => new Promise(r => setTimeout(r, ms));
+    async function neuerCode(){
+      const c = await mbCall("mb_unterschrift_code");
+      if(!c.ok){ fehler(serverHinweis(c)); return null; }
+      $("#sigQr").src = "data:image/bmp;base64," + c.qr; return c.token;
+    }
+    async function schleife(){
+      let token = await neuerCode(); if(!token) return;
+      const ende = Date.now() + 10 * 60 * 1000;
+      while(aktiv && Date.now() < ende){
+        await warte(3000); if(!aktiv) return;
+        const r = await mbCall("mb_unterschrift_abholen", {token});
+        if(!aktiv) return;
+        if(!r.ok){ fehler(r.error || "Abholen fehlgeschlagen."); token = await neuerCode(); if(!token) return; continue; }
+        if(r.wartet) continue;
+        const ok = await fotoVerarbeiten(r.b64);
+        if(ok) return;
+        token = await neuerCode(); if(!token) return;
+      }
+      if(aktiv) fehler("Der QR-Code ist abgelaufen – bitte das Fenster neu öffnen.");
+    }
+    async function fotoVerarbeiten(b64){
+      try{
+        const bin = atob(b64), u = new Uint8Array(bin.length);
+        for(let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+        const bmp = await createImageBitmap(new Blob([u], {type: "image/jpeg"}));
+        const cv = document.createElement("canvas"); cv.width = bmp.width; cv.height = bmp.height;
+        const cx = cv.getContext("2d", {willReadFrequently: true}); cx.drawImage(bmp, 0, 0);
+        const d = cx.getImageData(0, 0, cv.width, cv.height);
+        const f = freistellen(d.data, d.width, d.height);
+        if(!f){ fehler("Keine Unterschrift erkannt – bitte noch einmal fotografieren."); return false; }
+        const q = document.createElement("canvas"); q.width = f.breite; q.height = f.hoehe;
+        q.getContext("2d").putImageData(new ImageData(new Uint8ClampedArray(f.pixel), f.breite, f.hoehe), 0, 0);
+        const m = Math.min(1, 600 / f.breite), z = document.createElement("canvas");
+        z.width = Math.max(1, Math.round(f.breite * m)); z.height = Math.max(1, Math.round(f.hoehe * m));
+        const zx = z.getContext("2d"); zx.imageSmoothingQuality = "high"; zx.drawImage(q, 0, 0, z.width, z.height);
+        png = z.toDataURL("image/png").split(",")[1];
+        $("#sigVorschau").src = "data:image/png;base64," + png; fehler(""); zeige("vorschau"); return true;
+      }catch(e){ fehler("Das Foto konnte nicht gelesen werden – bitte noch einmal fotografieren."); return false; }
+    }
+    async function speichern(){
+      fehler("");
+      const r = await (await fetch("/api/unterschrift", {method: "PUT", headers: {"Content-Type": "application/json"}, body: JSON.stringify({b64: png})})).json().catch(() => ({ok: false, error: "Keine Verbindung zum Programm."}));
+      if(!r.ok){ fehler(r.error || "Speichern fehlgeschlagen."); return; }
+      gespeichert = true; dlg.close();
+    }
+    // Zeichnen
+    const cv = $("#sigCanvas"), cx = cv.getContext("2d");
+    const pos = e => { const r = cv.getBoundingClientRect(); return [(e.clientX - r.left) * cv.width / r.width, (e.clientY - r.top) * cv.height / r.height]; };
+    const leeren = () => { cx.clearRect(0, 0, cv.width, cv.height); gemalt = false; };
+    leeren(); cx.lineWidth = 3; cx.lineCap = "round"; cx.lineJoin = "round"; cx.strokeStyle = "#000";
+    cv.onpointerdown = e => { zeichnet = true; gemalt = true; cv.setPointerCapture(e.pointerId); const [x, y] = pos(e); cx.beginPath(); cx.moveTo(x, y); cx.lineTo(x + .01, y); cx.stroke(); };
+    cv.onpointermove = e => { if(!zeichnet) return; const [x, y] = pos(e); cx.lineTo(x, y); cx.stroke(); };
+    cv.onpointerup = cv.onpointercancel = () => { zeichnet = false; };
+    $("#sigLoeschen").onclick = leeren;
+    $("#sigZeichnen").onclick = () => { fehler(""); zeige("zeichnen"); };
+    $("#sigZurueck").onclick = () => { fehler(""); zeige("qr"); };
+    $("#sigZeichnenOk").onclick = () => {
+      if(!gemalt){ fehler("Bitte zuerst unterschreiben."); return; }
+      png = cv.toDataURL("image/png").split(",")[1]; speichern();
+    };
+    $("#sigUebernehmen").onclick = speichern;
+    $("#sigNeu").onclick = () => { fehler(""); zeige("qr"); schleife(); };
+    $("#sigZu").onclick = () => dlg.close();
+    dlg.onclose = () => { stopp(); fertig(gespeichert); };
+    fehler(""); leeren(); zeige("qr"); $("#sigQr").removeAttribute("src");
+    dlg.showModal(); schleife();
+  });
 }
 const kwText = k => `KW ${String(k.kw).padStart(2, "0")} / ${k.jahr}`;
 function renderMonteure(){
@@ -412,7 +584,12 @@ function gruppieren(berichte){
   return liste.sort((a, b) => (a.nr ? 0 : 1) - (b.nr ? 0 : 1) || a.datum.localeCompare(b.datum) || a.datei.localeCompare(b.datei, "de", {numeric: true}));
 }
 const merkKey = (w, g) => `mb|${w.email}|${w.jahr}|${w.kw}|${g.datei}`;
-function abgelegt(w, g){ try{ return localStorage.getItem(merkKey(w, g)) === g.ids; }catch(e){ return false; } }
+// Stand der Korrekturen, Rückfragen und Abzeichnung je Auftrag (vom Server, Schlüssel ist g.datei)
+const leerStand = () => ({korrekturen: [], klaerung: null, abzeichnung: null, schluessel: "0:0"});
+const standVon = g => (Object.prototype.hasOwnProperty.call(mb.vermerke, g.datei) && mb.vermerke[g.datei]) || leerStand();
+// Die PDF gilt als aktuell, wenn weder die Berichte noch die Vermerke seit dem Erstellen anders sind
+const merkWert = g => g.ids + "|" + standVon(g).schluessel;
+function abgelegt(w, g){ try{ return localStorage.getItem(merkKey(w, g)) === merkWert(g); }catch(e){ return false; } }
 const datumDe = d => /^\d{4}-\d{2}-\d{2}$/.test(d) ? d.split("-").reverse().join(".") : d;
 function renderWoche(){
   const w = mb.wahl, tb = $("#rows"); tb.innerHTML = "";
@@ -421,11 +598,13 @@ function renderWoche(){
     const tr = document.createElement("tr");
     const ok = abgelegt(w, g);
     const status = g.fehler ? `<span class="chip bad" title="${esc(g.fehler)}">Fehler</span>` : g.arbeit ? `<span class="chip info">wird erstellt …</span>` : ok ? `<span class="chip ok">✓ abgelegt</span>` : `<span class="chip warn">wartet</span>`;
+    const chips = statusChips(standVon(g)).map(c => `<span class="chip ${c.klasse}">${esc(c.text)}</span>`).join("");
     tr.innerHTML = `<td class="nr">${g.nr ? esc(g.nr) : '<span class="hint">ohne Nummer</span>'}</td>
       <td class="inhalt"><div class="liste">${g.berichte.map((b, i) => `<span class="chip ${b.art}">${i + 1}. ${esc(ART_NAME[b.art] || b.art)}${b.serie ? ` <span class="ser">${esc(b.serie)}</span>` : ""}</span>`).join("")}</div></td>
-      <td class="ort">${esc(datumDe(g.datum))}</td><td>${status}</td>
-      <td class="akt"><button type="button" ${ok ? "" : "disabled"}>📄 Öffnen</button></td>`;
+      <td class="ort">${esc(datumDe(g.datum))}</td><td><div class="liste">${status}${chips}</div></td>
+      <td class="akt"><button type="button" ${ok ? "" : "disabled"}>📄 Öffnen</button> <button type="button" class="pruefen">✎ Prüfen</button></td>`;
     tr.querySelector("button").onclick = () => zeigen({datei: g.datei});
+    tr.querySelector(".pruefen").onclick = () => pruefenOeffnen(g);
     tb.appendChild(tr);
   }
 }
@@ -446,12 +625,17 @@ async function kwOeffnen(m, k, scroll = true){
   $("#kwInfo").textContent = "Berichte werden geladen …";
   $("#kwOrdner").hidden = false; $("#kwNeu").hidden = false;
   $("#emptyBox").hidden = true; $("#tableBox").hidden = false; $("#rows").innerHTML = "";
+  mb.vermerke = {}; mb.hinweis = "";
   const r = await mbCall("mb_liste", {monteur: m.email, jahr: k.jahr, kw: k.kw});
   if(mb.wahl.email !== m.email || mb.wahl.kw !== k.kw || mb.wahl.jahr !== k.jahr) return;
   if(!r.ok){ $("#kwInfo").textContent = r.error || "Konnte nicht geladen werden."; return; }
   mb.gruppen = gruppieren(r.berichte || []);
+  const v = await mbCall("mb_vermerke", {monteur: m.email, jahr: k.jahr, kw: k.kw});
+  if(mb.wahl.email !== m.email || mb.wahl.kw !== k.kw || mb.wahl.jahr !== k.jahr) return;
+  mb.vermerke = v.ok ? (v.vermerke || {}) : {};
+  mb.hinweis = serverHinweis(v);
   const n = (r.berichte || []).length;
-  $("#kwInfo").textContent = `${n} ${n === 1 ? "Bericht" : "Berichte"} in ${mb.gruppen.length} ${mb.gruppen.length === 1 ? "Auftrag" : "Aufträgen"}`;
+  $("#kwInfo").textContent = `${n} ${n === 1 ? "Bericht" : "Berichte"} in ${mb.gruppen.length} ${mb.gruppen.length === 1 ? "Auftrag" : "Aufträgen"}` + (mb.hinweis ? " · " + mb.hinweis : "");
   renderWoche();
   erstellen();
 }
@@ -464,6 +648,18 @@ async function pdfHolen(id){
   for(let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
   if(mb.cache.size > 200) mb.cache.clear();
   mb.cache.set(id, u);
+  return u;
+}
+// Unterschrift einer Abzeichnung vom Server holen (PNG), je ID nur einmal
+async function unterschriftFuer(stand){
+  const id = stand.abzeichnung && stand.abzeichnung.unterschriftId;
+  if(!id) return null;
+  if(mb.sigCache.has(id)) return mb.sigCache.get(id);
+  const r = await mbCall("mb_unterschrift_datei", {datei: id});
+  if(!r.ok) throw new Error(r.error || "Unterschrift konnte nicht geladen werden.");
+  const bin = atob(r.b64), u = new Uint8Array(bin.length);
+  for(let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+  mb.sigCache.set(id, u);
   return u;
 }
 function b64(bytes){ let s = ""; for(let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000)); return btoa(s); }
@@ -479,6 +675,7 @@ async function erstellen(){
     if(abgelegt(w, g)) continue;
     g.arbeit = true; g.fehler = ""; renderWoche();
     try{
+      const wert = merkWert(g), stand = standVon(g);   // so, wie es beim Erstellen war – spätere Änderungen erzwingen eine neue PDF
       const ziel = await PDFLib.PDFDocument.create();
       ziel.setTitle(g.nr ? `Auftrag ${g.nr}` : g.datei); ziel.setAuthor(w.name); ziel.setProducer("Kundendienst Montageberichte");
       for(const b of g.berichte){
@@ -486,11 +683,13 @@ async function erstellen(){
         const seiten = await ziel.copyPages(quelle, quelle.getPageIndices());
         seiten.forEach(s => ziel.addPage(s));
       }
+      await pruefseiteAnhaengen(ziel, PDFLib, {auftrag: g.datei, monteur: w.name, kw: kwText(w), korrekturen: stand.korrekturen,
+        klaerung: stand.klaerung, abzeichnung: stand.abzeichnung, unterschrift: await unterschriftFuer(stand)});
       const bytes = await ziel.save();
       const r = await (await fetch("/api/ablage", {method: "POST", headers: {"Content-Type": "application/json"},
         body: JSON.stringify({monteur: w.name, jahr: w.jahr, kw: w.kw, datei: g.datei, b64: b64(bytes)})})).json();
       if(!r.ok) throw new Error(r.error || "Speichern fehlgeschlagen.");
-      try{ localStorage.setItem(merkKey(w, g), g.ids); }catch(e){}
+      try{ localStorage.setItem(merkKey(w, g), wert); }catch(e){}
       neu++;
     }catch(e){ g.fehler = e.message || String(e); fehler++; }
     g.arbeit = false;
@@ -647,6 +846,13 @@ $("#codeForm").addEventListener("submit", async e => {
   $("#codeDlg").close();
   if(state.blocked) $("#blockDlg").showModal(); else { toast("Freigeschaltet."); angemeldetWechsel(); }
 });
+$("#pruefZu").onclick = () => $("#pruefDlg").close();
+$("#pkSenden").onclick = async () => {
+  if(await vermerkSenden("mb_korrektur", {bereich: $("#pkBereich").value, vorher: $("#pkVorher").value.trim(), nachher: $("#pkNachher").value.trim()})){ $("#pkVorher").value = ""; $("#pkNachher").value = ""; }
+};
+$("#pqSetzen").onclick = async () => { if(await vermerkSenden("mb_klaerung", {aktion: "setzen", text: $("#pqText").value.trim()})) $("#pqText").value = ""; };
+$("#pqErledigt").onclick = () => vermerkSenden("mb_klaerung", {aktion: "erledigt"});
+$("#paSenden").onclick = abzeichnen;
 $("#blockRetry").onclick = async () => {
   const r = await call("check");
   if(r.ok && !r.blocked){ state.blocked = false; persist(); $("#blockDlg").close(); toast("Zugang ist wieder freigegeben."); monteureLaden(); }

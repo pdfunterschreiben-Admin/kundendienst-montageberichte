@@ -27,10 +27,22 @@ func (a *app) handleMb(w http.ResponseWriter, r *http.Request) {
 		Jahr    int    `json:"jahr"`
 		Kw      int    `json:"kw"`
 		Datei   string `json:"datei"`
+		// Korrekturen, Rückfragen, Abzeichnen und Unterschrift vom Handy
+		Auftrag      string `json:"auftrag"`
+		Aktion       string `json:"aktion"`
+		Bereich      string `json:"bereich"`
+		Vorher       string `json:"vorher"`
+		Nachher      string `json:"nachher"`
+		Text         string `json:"text"`
+		Unterschrift string `json:"unterschrift"`
+		Token        string `json:"token"`
 	}
-	_ = json.NewDecoder(io.LimitReader(r.Body, 1<<16)).Decode(&in)
+	// bis 1 MB: die Unterschrift (PNG als Base64) geht beim Abzeichnen mit
+	_ = json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&in)
 	switch in.Event {
-	case "mb_monteure", "mb_liste", "mb_datei":
+	case "mb_monteure", "mb_liste", "mb_datei",
+		"mb_vermerke", "mb_korrektur", "mb_klaerung", "mb_abzeichnen",
+		"mb_unterschrift_datei", "mb_unterschrift_code", "mb_unterschrift_abholen":
 	default:
 		writeJSON(w, map[string]any{"ok": false, "error": "Unbekannte Anfrage."})
 		return
@@ -52,6 +64,8 @@ func (a *app) handleMb(w http.ResponseWriter, r *http.Request) {
 	payload, _ := json.Marshal(map[string]any{
 		"key": ReportKey, "app": "montageberichte", "id": s.User.ID, "name": s.User.Name, "email": s.User.Email,
 		"event": in.Event, "monteur": in.Monteur, "jahr": in.Jahr, "kw": in.Kw, "datei": in.Datei, "version": Version,
+		"auftrag": in.Auftrag, "aktion": in.Aktion, "bereich": in.Bereich, "vorher": in.Vorher, "nachher": in.Nachher,
+		"text": in.Text, "unterschrift": in.Unterschrift, "token": in.Token,
 	})
 	c := &http.Client{Timeout: 90 * time.Second}
 	resp, err := c.Post(ReportURL, "application/json", bytes.NewReader(payload))
