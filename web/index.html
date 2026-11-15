@@ -282,6 +282,25 @@ main{background:linear-gradient(color-mix(in srgb,var(--paper) 93%,transparent),
 .fenster{display:flex;gap:2px}
 .fenster button{padding:6px 9px}
 #pruefMini{position:fixed;right:18px;bottom:18px;z-index:40;display:flex;align-items:center;gap:10px;background:var(--sheet);border:1px solid var(--line);border-left:3px solid var(--gelb);border-radius:8px;padding:8px 8px 8px 14px;box-shadow:0 8px 24px rgba(0,0,0,.18);font-size:13.5px}
+/* Menü oben rechts */
+.appbar-r{gap:10px}
+.appbar .wer{color:var(--bar-ink);font-size:13.5px}
+.menue{position:relative}
+button.burger{padding:8px;border-radius:6px}
+button.burger[aria-expanded="true"]{background:rgba(255,255,255,.14)}
+button.burger .ic{width:20px;height:20px}
+.menue-panel{position:absolute;right:0;top:calc(100% + 8px);z-index:50;width:320px;max-height:calc(100vh - 110px);overflow:auto;background:var(--sheet);color:var(--ink);border:1px solid var(--line);border-radius:10px;box-shadow:0 16px 40px rgba(0,0,0,.28)}
+.m-teil{padding:12px 14px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:8px;font-size:13.5px}
+.m-teil:last-child{border-bottom:0}
+.m-teil > b{font-size:13px;display:flex;align-items:center;gap:8px}
+.appbar .menue-panel .nutzer{margin:0;display:flex;flex-direction:column;align-items:flex-start;gap:2px;color:var(--ink)}
+.appbar .menue-panel .nutzer .row{gap:14px;margin-top:4px}
+.appbar .menue-panel .nutzer .link{color:var(--pen);text-decoration:underline}
+.appbar .menue-panel .ver{font-size:12.5px;color:var(--muted);display:flex;gap:8px;align-items:center;padding:0;border:0}
+.menue-panel .ver .test{color:#fff;background:var(--gelb);font-weight:600;font-size:11.5px;padding:1px 6px;border-radius:4px}
+.m-knoepfe{padding:6px}
+.m-zeile{border:0;background:transparent;width:100%;justify-content:flex-start;padding:8px;font-size:13.5px}
+.m-zeile:hover{background:var(--row)}
 @media (max-width:960px){body{height:auto;overflow:auto}.grid{grid-template-columns:minmax(0,1fr)}aside{border-right:0}.appbar{height:auto;flex-wrap:wrap;padding:10px 14px}}
 </style>
 </head>
@@ -289,10 +308,21 @@ main{background:linear-gradient(color-mix(in srgb,var(--paper) 93%,transparent),
 <header class="appbar">
   <div class="marke"><h1>Kundendienst Montageberichte</h1></div>
   <div class="appbar-r">
-    <p class="nutzer" id="userLine" hidden></p>
-    <span class="ver" id="verText">Version …</span>
-    <button class="bar" id="checkBtn" hidden>Nach Updates suchen</button>
-    <button class="bar" id="helpBtn">Anleitung</button>
+    <span class="wer" id="werKurz"></span>
+    <div class="menue">
+      <button type="button" class="bar burger" id="menueBtn" aria-haspopup="true" aria-expanded="false" aria-controls="menue" title="Menü"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4h11M2.5 8h11M2.5 12h11"/></svg></button>
+      <div class="menue-panel" id="menue" hidden>
+        <div class="m-teil"><p class="nutzer" id="userLine" hidden></p><span class="ver" id="verText">Version …</span></div>
+        <div class="m-teil m-knoepfe"><button type="button" class="m-zeile" id="checkBtn" hidden>Nach Updates suchen</button><button type="button" class="m-zeile" id="helpBtn">Anleitung</button></div>
+        <div class="m-teil"><b>Ablage</b><p class="hint">Fertige PDFs liegen in</p><p class="pfad" id="ablagePfad">…</p>
+        <button type="button" id="ablageBtn"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 4.5v8a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-6a1 1 0 0 0-1-1H8L6.5 3.5h-4a1 1 0 0 0-1 1z"/></svg> Ordner öffnen</button></div>
+        <div class="m-teil"><b>Meine Unterschrift <span class="hint" id="sigStatus"></span></b><div class="crop-prev" id="sigAnzeige" style="width:100%"><span class="hint">Noch keine hinterlegt</span></div>
+        <div class="row"><button type="button" id="sigAendern">Ändern</button><button type="button" class="ghost danger" id="sigLoeschen2" hidden>Löschen</button></div>
+        <p class="hint">Gilt für neue Abzeichnungen. Schon abgezeichnete Aufträge behalten ihre Unterschrift.</p></div>
+        <div class="m-teil" id="adminPanel" hidden><b>Testkanal <span class="chip info">Admin</span></b><label class="check"><input type="checkbox" id="testChannel"> Testversionen vor allen anderen bekommen</label>
+        <p class="hint">Wer die Montageberichte sehen darf: <button class="link" id="openSheet">Google-Tabelle öffnen</button> → Blatt „Nutzer Montageberichte“, Spalte „Berechtigt (ja)“.</p></div>
+      </div>
+    </div>
   </div>
 </header>
 <div class="wrap">
@@ -310,24 +340,7 @@ main{background:linear-gradient(color-mix(in srgb,var(--paper) 93%,transparent),
         <div id="monteure" class="liste-mont"></div>
         <p class="hint" id="monteureInfo">Wird geladen …</p>
       </section>
-      <details class="fach">
-        <summary>Ablage</summary>
-        <p class="hint">Fertige PDFs liegen in</p><p class="pfad" id="ablagePfad">…</p>
-        <button type="button" id="ablageBtn"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 4.5v8a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-6a1 1 0 0 0-1-1H8L6.5 3.5h-4a1 1 0 0 0-1 1z"/></svg> Ordner öffnen</button>
-      </details>
-      <details class="fach">
-        <summary>Meine Unterschrift <span class="hint" id="sigStatus"></span></summary>
-        <div class="crop-prev" id="sigAnzeige" style="width:100%"><span class="hint">Noch keine hinterlegt</span></div>
-        <div class="row"><button type="button" id="sigAendern">Ändern</button><button type="button" class="ghost danger" id="sigLoeschen2" hidden>Löschen</button></div>
-        <p class="hint">Gilt für neue Abzeichnungen. Schon abgezeichnete Aufträge behalten ihre Unterschrift.</p>
-      </details>
-      <details class="fach" id="adminPanel" hidden>
-        <summary>Testkanal <span class="chip info">Admin</span></summary>
-        <label class="check"><input type="checkbox" id="testChannel"> Testversionen vor allen anderen bekommen</label>
-        <p class="hint">Wer die Montageberichte sehen darf: <button class="link" id="openSheet">Google-Tabelle öffnen</button> → Blatt „Nutzer Montageberichte“, Spalte „Berechtigt (ja)“.</p>
-      </details>
     </aside>
-
     <main>
       <div class="doc">
         <div class="doc-head">
@@ -1009,6 +1022,13 @@ $("#pkSenden").onclick = async () => {
 $("#pqSetzen").onclick = async () => { if(await vermerkSenden("mb_klaerung", {aktion: "setzen", text: $("#pqText").value.trim()})) $("#pqText").value = ""; };
 $("#pqErledigt").onclick = () => vermerkSenden("mb_klaerung", {aktion: "erledigt"});
 $("#paSenden").onclick = abzeichnen;
+// Menü oben rechts: alles, was man selten braucht
+const menue = $("#menue"), menueBtn = $("#menueBtn");
+function menueZu(){ menue.hidden = true; menueBtn.setAttribute("aria-expanded", "false"); }
+menueBtn.onclick = e => { e.stopPropagation(); const auf = menue.hidden; menue.hidden = !auf; menueBtn.setAttribute("aria-expanded", String(auf)); };
+document.addEventListener("click", e => { if(!menue.hidden && !menue.contains(e.target)) menueZu(); });
+document.addEventListener("keydown", e => { if(e.key === "Escape" && !menue.hidden){ menueZu(); menueBtn.focus(); } });
+menue.addEventListener("click", e => { if(e.target.closest("#helpBtn, #checkBtn, #userChange, #userLogout, #sigAendern")) menueZu(); });
 // Gespeicherte Unterschrift anzeigen, ändern, löschen
 async function unterschriftAnzeigen(){
   const r = await (await fetch("/api/unterschrift")).json().catch(() => ({}));
@@ -1042,9 +1062,10 @@ $("#testChannel").onchange = e => { state.testChannel = e.target.checked; persis
 function renderUser(){
   renderAdmin();
   const el = $("#userLine");
+  $("#werKurz").textContent = state.user ? state.user.name : "";
   if(!state.user){ el.hidden = true; return; }
   el.hidden = false;
-  el.innerHTML = `<span title="${esc(state.user.email)}">${esc(state.user.name)}</span><button class="link" id="userChange">Ändern</button><button class="link" id="userLogout">Abmelden</button>`;
+  el.innerHTML = `<b>${esc(state.user.name)}</b><span class="hint">${esc(state.user.email)}</span><span class="row"><button class="link" id="userChange">Anmeldung ändern</button><button class="link" id="userLogout">Abmelden</button></span>`;
   $("#userChange").onclick = openRegistration;
   $("#userLogout").onclick = () => $("#logoutDlg").showModal();
 }
