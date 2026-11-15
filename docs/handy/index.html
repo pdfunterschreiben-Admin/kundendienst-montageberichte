@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Unterschrift fotografieren</title>
+<style>
+body{font:16px system-ui,sans-serif;margin:0;padding:20px;color:#1a1a1a;background:#f3f5f9}
+h2{margin:0 0 6px;font-size:20px}.hint{color:#5b6880;font-size:14px;margin:0 0 18px}
+label.btn,button{display:block;width:100%;text-align:center;background:#1d3fb8;color:#fff;border:0;border-radius:10px;padding:18px;font:600 18px system-ui,sans-serif;margin-bottom:10px}
+input{display:none}img{max-width:100%;border:1px solid #d8deea;border-radius:8px;background:#fff;margin-bottom:12px}
+#st{margin-top:14px;font-weight:600}.ok{color:#13703a}.err{color:#b42318}
+</style>
+</head>
+<body>
+<h2>Unterschrift fotografieren</h2>
+<p id="laden" class="hint">Wird geprüft …</p>
+<div id="abgelaufen" hidden>
+  <p class="err">Dieser QR-Code ist nicht mehr gültig.</p>
+  <p class="hint">Bitte im Programm „Kundendienst Montageberichte“ noch einmal „Unterschrift hinterlegen“ wählen und den neuen QR-Code scannen.</p>
+</div>
+<div id="foto" hidden>
+  <p class="hint">Unterschrift mit einem dunklen Stift auf ein weißes Blatt schreiben und fotografieren. Das Blatt sollte das Bild möglichst füllen und gleichmäßig hell sein.</p>
+  <label class="btn">📷 Unterschrift fotografieren<input type="file" id="k" accept="image/*" capture="environment"></label>
+  <div id="vorschau" hidden>
+    <img id="bild" alt="Vorschau der Unterschrift">
+    <button type="button" id="senden">Senden</button>
+  </div>
+</div>
+<div id="fertig" hidden><p class="ok">✓ Fertig – du kannst die Seite schließen. Die Unterschrift erscheint jetzt im Programm.</p></div>
+<div id="st"></div>
+
+<script>
+// Läuft ohne Google-Anmeldung: Die Seite schickt das Foto direkt an den Anmeldeserver (Apps Script, doPost),
+// wie die Handy-Seite der Service-Mappe. So stört es nicht, wenn im Handy mehrere Google-Konten angemeldet sind.
+var SERVER = "https://script.google.com/macros/s/AKfycbwj7l1K2RcGtPUu4wdRFjI7NLayzAtqjx0_XorzQmMNEqh-JyuEaOrUlOEN1BT9HVSC/exec";
+var MAX_ZEICHEN = 90000;   // so groß darf das Foto als Base64 höchstens sein (Grenze des Servers)
+var T = String(new URLSearchParams(location.search).get("sig") || "").replace(/[^a-f0-9]/g, "");
+var b64 = "";
+function $(id) { return document.getElementById(id); }
+function zeigen(id) { ["laden", "abgelaufen", "foto", "fertig"].forEach(function (x) { $(x).hidden = x !== id; }); }
+
+function anfrage(daten) {
+  daten.token = T;
+  return fetch(SERVER, { method: "POST", body: JSON.stringify(daten), credentials: "omit",
+    headers: { "Content-Type": "text/plain;charset=utf-8" } })
+    .then(function (r) { if (!r.ok) throw new Error("Server antwortet nicht (" + r.status + ")"); return r.text(); })
+    .then(function (t) {
+      var i = t.indexOf("\n"), kopf = i < 0 ? t : t.slice(0, i), rest = i < 0 ? "" : t.slice(i + 1);
+      if (kopf !== "OK") throw new Error(rest || t.slice(0, 200));
+      return rest;
+    });
+}
+
+function start(versuch) {
+  if (!T) { zeigen("abgelaufen"); return; }
+  anfrage({ event: "h_sig", aktion: "pruefen" }).then(function (r) {
+    zeigen(r === "1" ? "foto" : "abgelaufen");
+  }).catch(function (e) {
+    if (versuch < 3) { setTimeout(function () { start(versuch + 1); }, 1500 * versuch); return; }
+    $("laden").className = "err"; $("laden").textContent = "Keine Verbindung zum Server: " + e.message + ". Bitte Seite neu laden.";
+  });
+}
+
+function bildLaden(datei) {
+  if (window.createImageBitmap) return createImageBitmap(datei);
+  return new Promise(function (ok, no) {
+    var i = new Image(); i.onload = function () { ok(i); }; i.onerror = no; i.src = URL.createObjectURL(datei);
+  });
+}
+// Foto verkleinern, bis es als Base64 höchstens MAX_ZEICHEN Zeichen hat (Breite zuerst 900 px, Qualität 0,7)
+function komprimieren(bild) {
+  var w0 = bild.width || bild.naturalWidth, h0 = bild.height || bild.naturalHeight;
+  var breite = Math.min(900, w0), q = 0.7;
+  for (var i = 0; i < 12; i++) {
+    var c = document.createElement("canvas");
+    c.width = breite; c.height = Math.max(1, Math.round(h0 * breite / w0));
+    c.getContext("2d").drawImage(bild, 0, 0, c.width, c.height);
+    var s = c.toDataURL("image/jpeg", q).split(",")[1];
+    if (s.length <= MAX_ZEICHEN) return s;
+    q = Math.max(0.3, Math.round((q - 0.1) * 10) / 10);
+    breite = Math.max(300, Math.round(breite * 0.85));
+  }
+  return "";
+}
+
+$("k").onchange = function (e) {
+  var f = e.target.files[0]; e.target.value = "";
+  if (!f) return;
+  $("st").className = ""; $("st").textContent = "Foto wird vorbereitet …";
+  bildLaden(f).then(function (bild) {
+    b64 = komprimieren(bild);
+    if (!b64) throw new Error("Das Foto ist zu groß. Bitte näher an die Unterschrift herangehen.");
+    $("bild").src = "data:image/jpeg;base64," + b64;
+    $("vorschau").hidden = false; $("st").textContent = "";
+  }).catch(function (err) { $("st").className = "err"; $("st").textContent = "Fehler: " + (err && err.message || err); });
+};
+
+$("senden").onclick = function () {
+  var versuch = 0;
+  $("senden").disabled = true; $("st").className = ""; $("st").textContent = "Wird gesendet …";
+  (function senden() {
+    versuch++;
+    anfrage({ event: "h_sig", aktion: "hochladen", b64: b64, mime: "image/jpeg" }).then(function () {
+      zeigen("fertig"); $("st").textContent = "";
+    }).catch(function (err) {
+      var t = String(err && err.message || err);
+      if (versuch < 3 && !/QR-Code|Foto/.test(t)) { setTimeout(senden, 2000 * versuch); return; }
+      $("senden").disabled = false; $("st").className = "err"; $("st").textContent = "Fehler: " + t;
+    });
+  })();
+};
+
+start(1);
+</script>
+</body>
+</html>
