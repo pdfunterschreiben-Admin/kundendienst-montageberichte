@@ -33,8 +33,8 @@ Korrigiert wird in diesen Fällen (so von Benjamin genannt):
 ## Anti-Ziele (wäre ein Fehlschlag, auch wenn es technisch läuft)
 - Eine Korrektur ohne Namen oder ohne Zeitpunkt.
 - Vermerke, die beim Neu-Erstellen, am anderen PC oder nach einem Update verschwinden.
-- Eine Unterschrift, die dauerhaft auf dem Server liegt oder bei anderen Nutzern sichtbar ist. Nur die kurze
-  Zwischenablage beim Hochladen vom Handy ist erlaubt (siehe „Unterschrift per Handy“).
+- Ein Handy-Foto der Unterschrift, das länger als nötig auf dem Server liegt (nur kurz zum Abholen).
+- Eine PDF, die an einem anderen PC ohne Unterschriftsbild entsteht, obwohl der Bericht abgezeichnet ist.
 - Ein Bericht, der abgezeichnet aussieht, obwohl danach noch etwas korrigiert wurde.
 
 ## Constraints
@@ -45,6 +45,11 @@ Korrigiert wird in diesen Fällen (so von Benjamin genannt):
   Das gilt auch für die neuen Funktionen.
 - `server/Montageberichte.js` muss von Hand ins Apps-Script-Projekt kopiert werden (ohne die letzte `module.exports`-Zeile).
 - Mehrere Kollegen arbeiten auf demselben Remote-Server, jeder mit eigenem Windows-Benutzer.
+- Das Routing der Anfragen (`doPost`) steht in `admin/Code.gs` im Repository der Service-Mappe und läuft im selben
+  Apps-Script-Projekt. Dort wird nichts geändert. Die nötigen Zeilen stehen in `docs/server-einspielen.md`
+  und werden von Hand ins Apps-Script-Projekt eingefügt.
+- Die Handy-Seite muss auf GitHub Pages liegen, nicht als Google-Seite (`doGet`): Die Service-Mappe hatte damit
+  Fehler, wenn im Handy mehrere Google-Konten angemeldet sind.
 
 ## Ansätze
 - **A. Prüfseite hinten anhängen (gewählt).** Original bleibt, eine Seite „Korrekturen und Prüfung“ kommt dazu.
@@ -56,7 +61,8 @@ Korrigiert wird in diesen Fällen (so von Benjamin genannt):
 - Unterschrift: einmal im Programm hinterlegen, beim Abzeichnen einfügen (so von Benjamin bestätigt).
   Hinterlegt wird sie per **QR-Code und Handy**: Das Programm zeigt einen QR-Code, das Handy fotografiert die
   Unterschrift auf einem Blatt Papier (so von Benjamin gewünscht). Ein Zeichenfeld mit Maus oder Stift bleibt als
-  Ersatz.
+  Ersatz. Beim Abzeichnen wird sie mit der Abzeichnung auf dem Server gespeichert, damit jede PDF an jedem PC
+  gleich aussieht, auch wenn jemand anderes sie neu erstellt (so von Benjamin entschieden).
 
 ## Die Entscheidungen im Einzelnen
 
@@ -96,7 +102,11 @@ Korrigiert wird in diesen Fällen (so von Benjamin genannt):
   Spalten: Zeitpunkt, Ereignis, Monteur-E-Mail, Jahr, KW, Auftrag, Bereich, Vorher, Nachher, Text, Name, E-Mail.
 - Ereignisse: `korrektur`, `klaerung_setzen`, `klaerung_erledigt`, `abzeichnung`.
 - Neue Anfragen im Büro-Programm (alle über `montageberichteAnfrage` und `mbNutzer`):
-  `mb_vermerke` (alle Vermerke einer Kalenderwoche), `mb_korrektur`, `mb_klaerung`, `mb_abzeichnen`.
+  `mb_vermerke` (alle Vermerke einer Kalenderwoche), `mb_korrektur`, `mb_klaerung`, `mb_abzeichnen` (mit der
+  Unterschrift als PNG), `mb_unterschrift_datei` (Unterschrift einer Abzeichnung holen), `mb_unterschrift_code`,
+  `mb_unterschrift_abholen`. Die schreibenden Anfragen laufen unter einer Skript-Sperre, damit zwei Nutzer
+  gleichzeitig nichts durcheinanderbringen. Dazu kommt das öffentliche Ereignis `h_sig` für die Handy-Seite.
+- Das Blatt „Korrekturen Montageberichte“ bekommt zusätzlich die Spalte „Unterschrift-ID“ (Drive-Datei der Abzeichnung).
 - Der aktuelle Stand eines Auftrags wird aus dem Verlauf berechnet: Liste der Korrekturen, Rückfrage offen oder nicht,
   abgezeichnet nur wenn die letzte Abzeichnung nach dem letzten Korrektur- oder Rückfrage-Ereignis liegt.
   Diese Berechnung ist eine eigene Funktion, damit man sie ohne Google testen kann.
@@ -106,7 +116,7 @@ Korrigiert wird in diesen Fällen (so von Benjamin genannt):
 
 ### Programm (Go)
 - Neue Schnittstelle `/api/unterschrift`: Unterschrift als PNG lesen und speichern, in `dataDir()` je Windows-Benutzer
-  (`unterschrift.png`). Dauerhaft liegt sie nur dort. Der Server bekommt sie nur kurz beim Hochladen vom Handy.
+  (`unterschrift.png`). Beim Abzeichnen geht sie mit der Abzeichnung zum Server (siehe „Unterschrift per Handy“).
 - Die neuen Server-Anfragen laufen über `handleMb`: Dort kommen die vier neuen Ereignisse in die Liste der
   erlaubten Anfragen und die Felder (Bereich, Vorher, Nachher, Text, Auftrag) in die Anfrage.
 - Ist der Server noch nicht aktualisiert, antwortet er „Unbekannte Anfrage“. Das Programm zeigt dann einen klaren
@@ -116,27 +126,28 @@ Korrigiert wird in diesen Fällen (so von Benjamin genannt):
 - Herausgabe nur als Testversion (`TESTVERSION` höher, z. B. 1.1.0). `VERSION` bleibt unverändert, bis Benjamin es sagt.
 
 ### Unterschrift per Handy
-QR-Codes lesen iPhone und Android gleich mit der normalen Kamera-App, ohne dass eine App nötig ist.
-Das Handy kommt aber nicht an das Programm auf dem PC heran, deshalb läuft es über den Server (Apps Script):
-1. Das Programm fragt beim Server einen **einmaligen Code** an (zufällig, mindestens 24 Zeichen, gilt 10 Minuten,
-   gehört zum angemeldeten Nutzer) und zeigt den Link mit dem Code als QR-Code. Dafür braucht das Programm eine
-   QR-Erzeugung (Bibliothek im Programm oder im Browserteil). Die Wahl trifft der Baumeister, sie muss ohne
-   Internet am PC funktionieren oder wie pdf-lib beim ersten Start geladen und zwischengespeichert werden.
-2. Das Handy öffnet den Link. Die kleine Seite (vom Server ausgeliefert) bietet „Unterschrift fotografieren“
-   (Kamera des Handys, `capture`), zeigt das Foto zur Kontrolle und schickt es hoch. Ohne Anmeldung am Handy,
-   der Code allein reicht, und er gilt nur einmal.
-3. Der Server legt das Foto **nur bis zum Abholen, höchstens 10 Minuten** ab.
-4. Das Programm fragt alle paar Sekunden nach, holt das Foto ab, schneidet den Rand zu, macht den weißen Papierhintergrund
-   durchsichtig und zeigt die Vorschau. Erst nach „Übernehmen“ wird es als `unterschrift.png` lokal gespeichert.
-5. Der Server löscht das Foto sofort nach dem Abholen, sonst nach 10 Minuten, und gibt den Code nie ein zweites Mal frei.
-- Neue Server-Ereignisse dafür: `unterschrift_code` (Büro-Programm), `unterschrift_abholen` (Büro-Programm),
-  `unterschrift_hochladen` (Handy-Seite, ohne Anmeldung, nur mit gültigem Code).
-- **Meine Entscheidung:** Ablage zwischendurch im Skript-Cache bzw. in den Skript-Eigenschaften des Apps-Script-Projekts,
-  nicht in Google Drive, damit nichts als Datei liegen bleibt. Das Foto wird vor dem Hochladen am Handy auf
-  etwa 1000 Pixel Breite verkleinert.
-- **Offen für den Baumeister (im Code nicht zu sehen):** Liefert das Apps-Script-Projekt „PDF Unterschreiben Anmeldung“
-  schon Seiten per `doGet` aus, und ist die Web-App für „Jeden“ erreichbar? Davon hängt ab, wie die Handy-Seite
-  eingebunden wird. Diese Datei im Repository enthält nur `server/Montageberichte.js`, nicht das übrige Projekt.
+Vorbild ist der vorhandene Weg „Typenschild per Handy“ der Service-Mappe (`ts_start`/`tsFoto` in `admin/Vorlagen.js`,
+Handy-Seite `docs/handy/index.html` auf GitHub Pages, Anfragen per `doPost` ohne Google-Anmeldung).
+QR-Codes lesen iPhone und Android gleich mit der normalen Kamera.
+1. Das Programm schickt `mb_unterschrift_code`. Der Server erzeugt einen Code (24 Zeichen, nur 0-9 und a-f, aus
+   `Utilities.getUuid()`), legt im Skript-Cache `sig_<code>` auf „WARTEN“ für 10 Minuten (gehört zum angemeldeten Nutzer)
+   und antwortet mit dem Link `<Handy-Seite>?sig=<code>` und dem QR-Code als Bild. Den QR-Code erzeugt
+   `qrBmpBase64` aus `admin/QrCode.js`, das schon im Projekt liegt. Eine QR-Bibliothek im Programm ist nicht nötig.
+2. Die Handy-Seite (neu: `docs/handy/index.html` in diesem Repository, GitHub Pages) prüft den Code, öffnet die
+   Kamera (`capture`), verkleinert das Foto auf höchstens 90000 Zeichen Base64 und schickt es per `fetch` als
+   `text/plain` an den Anmeldeserver (Ereignis `h_sig`, ohne Anmeldung, nur mit gültigem Code).
+3. Der Server hält das Foto nur im Cache, höchstens 10 Minuten. Das Programm fragt alle paar Sekunden mit
+   `mb_unterschrift_abholen`. Der Server liefert das Foto einmal und löscht es dabei.
+4. Das Programm schneidet den Rand zu, macht den Papierhintergrund durchsichtig, zeigt die Vorschau und speichert
+   nach „Übernehmen“ als `unterschrift.png` lokal.
+5. Beim Abzeichnen schickt das Programm diese Unterschrift mit. Der Server legt sie in Drive unter
+   „Kundendienst Montageberichte/Unterschriften“ ab (gleiche Unterschrift derselben Person nur einmal, erkannt an
+   der Prüfsumme) und die Abzeichnung verweist darauf. Jedes Programm holt sie mit `mb_unterschrift_datei`,
+   wenn es die Prüfseite baut.
+- **Meine Entscheidung:** Zeitlimit 10 Minuten (beim Typenschild sind es 20).
+- **Von Benjamin einmalig zu tun:** GitHub Pages für dieses Repository einschalten (Ordner `/docs`), die Server-Datei
+  und wenige Zeilen in `Code.gs` im Apps-Script-Projekt einfügen, neue Bereitstellung veröffentlichen.
+  Die Anleitung dazu liefert der Plan als `docs/server-einspielen.md`.
 
 ## Was bewusst offen bleibt
 - Genaue Gestaltung (Abstände, Farben, Größe der Prüfseite) entscheidet der Baumeister im Stil des bestehenden Programms.
