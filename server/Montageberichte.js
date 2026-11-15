@@ -5,8 +5,9 @@
 // im Ordner „Kundendienst Montageberichte/<Monteur>“ und bekommt eine Zeile im Blatt „Montageberichte“
 // (Monteur, Berichtsdatum, Kalenderwoche, Auftragsnummer, Art …).
 // Das Büro-Programm „Kundendienst Montageberichte“ (app: 'montageberichte') liest Monteure, Kalenderwochen
-// und Berichte und holt die PDFs ab. Berechtigt sind nur freigeschaltete Rechner, deren Zeile im Blatt
-// „Nutzer Montageberichte“ in „Berechtigt (ja)“ ein „ja“ hat (Admins immer).
+// und Berichte und holt die PDFs ab. Wer sich im Programm angemeldet hat und
+// freigeschaltet ist, darf die Berichte sehen (das Programm ist nur für die Dispo gedacht). Sperren: im Blatt
+// „Nutzer Montageberichte“ in „Gesperrt (ja)“ ein „ja“ eintragen.
 
 const MB_BLATT = 'Montageberichte';
 const MB_HEAD = ['Eingang', 'Monteur', 'E-Mail', 'Berichtsdatum', 'Jahr', 'KW', 'Auftragsnummer', 'Art', 'Seriennummer', 'Dateiname', 'Datei-ID', 'Prüfsumme'];
@@ -120,8 +121,6 @@ function mbNutzer(ss, d) {
   const r = users.getRange(row, 1, 1, 13).getValues()[0];
   if (String(r[1]).toLowerCase() !== mail || String(r[6]).toLowerCase() !== 'ja') throw new Error('Bitte neu anmelden.');
   if (String(r[7]).trim().toLowerCase() === 'ja') throw new Error('Dein Zugang wurde gesperrt.');
-  if (ADMIN_MAILS.indexOf(mail) < 0 && String(r[12]).trim().toLowerCase() !== 'ja')
-    throw new Error('Du bist noch nicht für die Montageberichte freigegeben. Bitte beim Admin melden (Blatt „Nutzer Montageberichte“, Spalte „Berechtigt (ja)“).');
   return { mail: mail, name: String(r[0] || '') };
 }
 
