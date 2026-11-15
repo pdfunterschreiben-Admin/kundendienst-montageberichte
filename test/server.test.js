@@ -164,3 +164,26 @@ test('mb_unterschrift_datei nur für bekannte IDs', () => {
 test('unbekanntes Ereignis', () => {
   assert.deepEqual(anfrage('mb_loeschen', {}, berta, fakeAblage()), { ok: false, error: 'Unbekannte Anfrage.' });
 });
+
+// ---- Übersicht für „Zu prüfen“, Zahlen je Monteur/KW und Archiv ----
+const zeile = (mail, jahr, kw, nr, id) => [new Date(1000), 'Max', mail, '2026-11-05', jahr, kw, nr, 'montage', 'RRE-1234567', nr + '.pdf', id, 'sha'];
+const v = (ereignis, mail, jahr, kw, auftrag, t, extra) => Object.assign({ t, ereignis, monteur: mail, jahr, kw, auftrag, bereich: '', vorher: '', nachher: '', text: '', name: 'X', mail: 'x@x', unterschriftId: '' }, extra || {});
+const datumText = d => d instanceof Date ? '2026-11-05' : String(d);
+
+test('mbUebersicht: Berichte der letzten Wochen mit Monteur und KW, ältere nicht', () => {
+  // 26 Wochen bis KW 46/2026: ab KW 21/2026; über den Jahreswechsel zählt die Woche weiter
+  const r = s.mbUebersicht([zeile('a@x', 2026, 45, '1', 'F1'), zeile('b@x', 2026, 21, '2', 'F2'), zeile('b@x', 2026, 20, '4', 'F4'), zeile('a@x', 2025, 50, '3', 'F3')], [], { jahr: 2026, kw: 46 }, 26, datumText);
+  assert.deepEqual(r.berichte.map(b => [b.monteur, b.jahr, b.kw, b.id]), [['a@x', 2026, 45, 'F1'], ['b@x', 2026, 21, 'F2']]);
+  const neujahr = s.mbUebersicht([zeile('a@x', 2025, 50, '3', 'F3')], [], { jahr: 2026, kw: 2 }, 26, datumText);
+  assert.equal(neujahr.berichte.length, 1);
+  assert.equal(r.berichte[0].nr, '1');
+});
+
+test('mbUebersicht: Stand je Auftrag in Kurzform (abgezeichnet, Rückfrage, Korrekturen)', () => {
+  const r = s.mbUebersicht([zeile('a@x', 2026, 45, '1', 'F1')], [
+    v('korrektur', 'a@x', 2026, 45, '1', 1), v('abzeichnung', 'a@x', 2026, 45, '1', 2),
+    v('klaerung_setzen', 'a@x', 2026, 45, '2', 3, { text: '?' }),
+  ], { jahr: 2026, kw: 46 }, 26, datumText);
+  assert.deepEqual(r.stand['a@x|2026|45|1'], { abgezeichnet: true, rueckfrage: false, korrekturen: 1 });
+  assert.deepEqual(r.stand['a@x|2026|45|2'], { abgezeichnet: false, rueckfrage: true, korrekturen: 0 });
+});

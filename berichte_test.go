@@ -90,3 +90,14 @@ func TestHandleMbUnbekannteAnfrage(t *testing.T) {
 		t.Fatalf("Antwort %s, Serveraufrufe %d", out, *n)
 	}
 }
+
+func TestHandleMbUebersichtWirdWeitergereicht(t *testing.T) {
+	_, last, _ := testServer(t)
+	angemeldet(t)
+	if out := postMb(t, `{"event":"mb_uebersicht"}`); !strings.Contains(out, `"gesehen":true`) {
+		t.Fatalf("mb_uebersicht wird abgelehnt: %s", out)
+	}
+	if (*last)["event"] != "mb_uebersicht" {
+		t.Fatalf("nicht beim Server angekommen: %v", *last)
+	}
+}

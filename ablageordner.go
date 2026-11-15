@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"os"
@@ -23,13 +24,7 @@ func standardAblage() string {
 	return filepath.Join(home, "Documents", "Kundendienst Montageberichte")
 }
 
-func gewaehlteAblage() string {
-	b, err := os.ReadFile(ablageWahlPfad())
-	if err != nil {
-		return ""
-	}
-	return strings.TrimSpace(string(b))
-}
+func gewaehlteAblage() string { return gemerkterOrdner(ablageWahlPfad()) }
 
 func istOrdner(p string) bool {
 	st, err := os.Stat(p)
@@ -58,32 +53,50 @@ func (a *app) handleAblageWahl(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, map[string]any{"ok": false, "error": "Ungültige Anfrage."})
 			return
 		}
-		p := strings.TrimSpace(in.Pfad)
-		if p == "" {
-			_ = os.Remove(ablageWahlPfad())
-			writeJSON(w, map[string]any{"ok": true, "pfad": ablageOrdner()})
-			return
-		}
-		p = filepath.Clean(p)
-		if !filepath.IsAbs(p) || !istOrdner(p) {
-			writeJSON(w, map[string]any{"ok": false, "error": "Diesen Ordner gibt es nicht."})
-			return
-		}
-		probe, err := os.CreateTemp(p, ".schreibtest-*")
+		p, err := ordnerMerken(ablageWahlPfad(), in.Pfad)
 		if err != nil {
-			writeJSON(w, map[string]any{"ok": false, "error": "In diesen Ordner darf nicht geschrieben werden."})
+			writeJSON(w, map[string]any{"ok": false, "error": err.Error()})
 			return
 		}
-		probe.Close()
-		_ = os.Remove(probe.Name())
-		if err := os.WriteFile(ablageWahlPfad(), []byte(p), 0o600); err != nil {
-			writeJSON(w, map[string]any{"ok": false, "error": "Speichern fehlgeschlagen: " + err.Error()})
-			return
+		if p == "" {
+			p = ablageOrdner()
 		}
 		writeJSON(w, map[string]any{"ok": true, "pfad": p})
 	default:
 		http.Error(w, "GET oder PUT", http.StatusMethodNotAllowed)
 	}
+}
+
+// ordnerMerken prüft den Ordner (vorhanden, beschreibbar) und schreibt ihn in die Datei datei.
+// Leerer Pfad löscht die Wahl. Rückgabe: der gemerkte Pfad ("" = keiner).
+func ordnerMerken(datei, pfad string) (string, error) {
+	p := strings.TrimSpace(pfad)
+	if p == "" {
+		_ = os.Remove(datei)
+		return "", nil
+	}
+	p = filepath.Clean(p)
+	if !filepath.IsAbs(p) || !istOrdner(p) {
+		return "", errors.New("Diesen Ordner gibt es nicht.")
+	}
+	probe, err := os.CreateTemp(p, ".schreibtest-*")
+	if err != nil {
+		return "", errors.New("In diesen Ordner darf nicht geschrieben werden.")
+	}
+	probe.Close()
+	_ = os.Remove(probe.Name())
+	if err := os.WriteFile(datei, []byte(p), 0o600); err != nil {
+		return "", errors.New("Speichern fehlgeschlagen: " + err.Error())
+	}
+	return p, nil
+}
+
+func gemerkterOrdner(datei string) string {
+	b, err := os.ReadFile(datei)
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(b))
 }
 
 // GET ?pfad=…: Unterordner zum Auswählen. Ohne pfad: Startorte (Dokumente, Desktop, Laufwerke).

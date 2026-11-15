@@ -175,6 +175,11 @@ function montageberichteAnfrage(d) {
     });
     return { ok: true, berichte: out };
   }
+  if (ev === 'mb_uebersicht') {
+    const heute = mbKw(new Date());
+    return mbUebersicht(mbZeilen(), mbAblage(ss).zeilen(), heute, 26,
+      function (v) { return v instanceof Date ? Utilities.formatDate(v, tz, 'yyyy-MM-dd') : String(v); });
+  }
   if (ev === 'mb_datei') {
     const id = String(d.datei || '');
     if (!/^[\w\-]{10,100}$/.test(id)) return { ok: false, error: 'Ungültige Datei.' };
@@ -182,6 +187,32 @@ function montageberichteAnfrage(d) {
     return { ok: true, b64: Utilities.base64Encode(DriveApp.getFileById(id).getBlob().getBytes()) };
   }
   return { ok: false, error: 'Unbekannte Anfrage.' };
+}
+
+// ---------------- Übersicht: was ist noch zu prüfen? ----------------
+// Alle Berichte der letzten `wochen` Kalenderwochen (bis `heute` = {jahr, kw}) mit Monteur und KW, dazu je Auftrag
+// eine Kurzfassung des Prüfstands. Schlüssel: "<monteur>|<jahr>|<kw>|<auftrag>". zeilen/vermerke wie mbZeilen()/mbAblage().zeilen().
+function mbUebersicht(zeilen, vermerke, heute, wochen, datumText) {
+  const nr = function (j, k) { return Number(j) * 53 + Number(k); };
+  const ab = nr(heute.jahr, heute.kw) - wochen + 1;
+  const berichte = [];
+  zeilen.forEach(function (r) {
+    if (nr(r[4], r[5]) < ab) return;
+    berichte.push({ monteur: String(r[2]).toLowerCase(), jahr: Number(r[4]), kw: Number(r[5]), id: String(r[10]), nr: String(r[6]), art: String(r[7]),
+      serie: String(r[8]), datei: String(r[9]), datum: datumText(r[3]), eingang: r[0] instanceof Date ? r[0].getTime() : 0 });
+  });
+  const gruppen = Object.create(null);
+  vermerke.forEach(function (z) {
+    if (nr(z.jahr, z.kw) < ab) return;
+    const k = String(z.monteur).toLowerCase() + '|' + Number(z.jahr) + '|' + Number(z.kw) + '|' + z.auftrag;
+    (gruppen[k] = gruppen[k] || []).push(z);
+  });
+  const stand = Object.create(null);
+  Object.keys(gruppen).forEach(function (k) {
+    const st = mbStand(gruppen[k]);
+    stand[k] = { abgezeichnet: !!st.abzeichnung, rueckfrage: !!(st.klaerung && st.klaerung.offen), korrekturen: st.korrekturen.length };
+  });
+  return { ok: true, berichte: berichte, stand: stand };
 }
 
 // ---------------- Korrekturen, Rückfragen und Abzeichnung ----------------
@@ -362,4 +393,4 @@ function mbVermerkAnfrage(ev, d, nutzer, ablage, jetzt) {
   return { ok: true, stand: stand() };
 }
 
-if (typeof module !== 'undefined') module.exports = { mbKw, mbDatum, MB_BEREICHE, mbStand, mbVermerkPruefen, mbVermerkAnfrage, MB_HANDY_URL, mbSigCode, mbSigHandy, mbSigAbholen };
+if (typeof module !== 'undefined') module.exports = { mbUebersicht, mbKw, mbDatum, MB_BEREICHE, mbStand, mbVermerkPruefen, mbVermerkAnfrage, MB_HANDY_URL, mbSigCode, mbSigHandy, mbSigAbholen };
