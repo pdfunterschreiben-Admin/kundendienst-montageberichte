@@ -333,7 +333,6 @@ main{background:linear-gradient(color-mix(in srgb,var(--paper) 93%,transparent),
         <div class="doc-head">
           <div class="col" style="gap:2px"><span class="doc-name" id="kwTitel">Bitte links einen Monteur und eine Kalenderwoche wählen</span><span class="hint" id="kwInfo"></span></div>
           <div class="row">
-            <button type="button" id="kwOrdner" hidden><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 4.5v8a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-6a1 1 0 0 0-1-1H8L6.5 3.5h-4a1 1 0 0 0-1 1z"/></svg> Ordner der KW</button>
             <button type="button" id="kwNeu" hidden title="Alle PDFs dieser Woche neu zusammenstellen"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9M13.5 2.5v3h-3"/></svg> Neu erstellen</button>
           </div>
         </div>
@@ -449,7 +448,7 @@ main{background:linear-gradient(color-mix(in srgb,var(--paper) 93%,transparent),
 
 <dialog id="pruefDlg">
   <div class="dlg">
-    <div class="dlg-head"><strong id="pruefTitel">Bericht prüfen</strong><span class="row" style="gap:8px"><span class="fenster"><button type="button" class="ghost" id="pruefMin" title="Minimieren" aria-label="Minimieren"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 12.5h10"/></svg></button><button type="button" class="ghost" id="pruefMax" title="Maximieren" aria-label="Maximieren"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><rect x="2.5" y="2.5" width="11" height="11" rx="1"/></svg></button></span><button type="button" class="ghost" id="pruefExtern" title="Mit dem PDF-Programm von Windows öffnen"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M9 2.5h4.5V7M13.5 2.5 7 9M11.5 9.5v4h-9v-9h4"/></svg> Extern öffnen</button><button type="button" class="ghost" id="pruefZu">Schließen</button></span></div>
+    <div class="dlg-head"><strong id="pruefTitel">Bericht prüfen</strong><span class="row" style="gap:8px"><span class="fenster"><button type="button" class="ghost" id="pruefMin" title="Minimieren" aria-label="Minimieren"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 12.5h10"/></svg></button><button type="button" class="ghost" id="pruefMax" title="Maximieren" aria-label="Maximieren"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><rect x="2.5" y="2.5" width="11" height="11" rx="1"/></svg></button></span><button type="button" class="ghost" id="pruefZu">Schließen</button></span></div>
     <div class="pruef-grid">
     <div class="pruef-pdfbox"><iframe id="pruefPdf" class="pruef-pdf" title="Bericht" hidden></iframe><div id="pruefPdfLeer" class="hint">PDF wird erstellt …</div></div>
     <div class="dlg-body col" style="gap:16px">
@@ -758,13 +757,6 @@ function renderWoche(){
   }
   if($("#pruefDlg").open) pruefPdfLaden();
 }
-async function zeigen(extra){
-  const w = mb.wahl;
-  const r = await (await fetch("/api/ablage/zeigen", {method: "POST", headers: {"Content-Type": "application/json"},
-    body: JSON.stringify(w ? {monteur: w.name, jahr: w.jahr, kw: w.kw, ...extra} : {})})).json().catch(() => ({ok: false}));
-  if(!r.ok) toast(r.error || "Konnte nicht geöffnet werden.");
-}
-$("#kwOrdner").onclick = () => zeigen({});
 $("#ablageBtn").onclick = async () => { const r = await (await fetch("/api/ablage/zeigen", {method: "POST", headers: {"Content-Type": "application/json"}, body: "{}"})).json().catch(() => ({})); if(!r.ok) toast(r.error || "Konnte nicht geöffnet werden."); };
 $("#kwNeu").onclick = () => { if(!mb.wahl) return; for(const g of mb.gruppen){ try{ localStorage.removeItem(merkKey(mb.wahl, g)); }catch(e){} } erstellen(); };
 
@@ -773,7 +765,7 @@ async function kwOeffnen(m, k, scroll = true){
   renderMonteure();
   $("#kwTitel").textContent = `${m.name} · ${kwText(k)}`;
   $("#kwInfo").textContent = "Berichte werden geladen …";
-  $("#kwOrdner").hidden = false; $("#kwNeu").hidden = false;
+  $("#kwNeu").hidden = false;
   $("#emptyBox").hidden = true; $("#tableBox").hidden = false; $("#rows").innerHTML = "";
   mb.vermerke = {}; mb.hinweis = "";
   const r = await mbCall("mb_liste", {monteur: m.email, jahr: k.jahr, kw: k.kw});
@@ -1011,7 +1003,6 @@ $("#pruefMax").onclick = () => {
   $("#pruefMax").innerHTML = max ? '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><rect x="2.5" y="5" width="8.5" height="8.5" rx="1"/><path d="M5 5V2.5h8.5V11H11"/></svg>' : '<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><rect x="2.5" y="2.5" width="11" height="11" rx="1"/></svg>';
 };
 $("#pruefDlg").addEventListener("close", () => { $("#pruefPdf").src = "about:blank"; pruefPdfWert = ""; });
-$("#pruefExtern").onclick = () => { if(pruefG) zeigen({datei: pruefG.datei}); };
 $("#pkSenden").onclick = async () => {
   if(await vermerkSenden("mb_korrektur", {bereich: $("#pkBereich").value, vorher: $("#pkVorher").value.trim(), nachher: $("#pkNachher").value.trim()})){ $("#pkVorher").value = ""; $("#pkNachher").value = ""; }
 };
