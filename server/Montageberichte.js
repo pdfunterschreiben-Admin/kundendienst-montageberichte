@@ -17,6 +17,8 @@ const MB_ARTEN = { montage: 'Montagebericht', uvv: 'UVV Bericht', dguv: 'DGUV V3
 // Admins immer, sonst wer im Blatt „Nutzer“ in der Spalte „An Kundendienst senden (ja)“ ein „ja“ hat.
 // Notfalls hier E-Mails eintragen, '*' = alle Monteure.
 const MB_FREI = [];
+// Testkonto: Berichte mit dieser Adresse als Monteur sind Testberichte und nur für diese Adresse sichtbar.
+const MB_TEST_MAILS = ['benjaminstockey@gmail.com'];
 const MB_FREI_SPALTE = 'An Kundendienst senden (ja)';
 
 function mbFreiSpalte(users) {
@@ -30,7 +32,7 @@ function mbFreiSpalte(users) {
 function mbFreiFuer(mail, users) {
   mail = String(mail || '').toLowerCase();
   if (!mail) return false;
-  if (ADMIN_MAILS.indexOf(mail) >= 0 || MB_FREI.indexOf('*') >= 0 || MB_FREI.indexOf(mail) >= 0) return true;
+  if (ADMIN_MAILS.indexOf(mail) >= 0 || MB_TEST_MAILS.indexOf(mail) >= 0 || MB_FREI.indexOf('*') >= 0 || MB_FREI.indexOf(mail) >= 0) return true;
   users = users || SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Nutzer');
   if (!users) return false;
   const c = mbFreiSpalte(users), lr = users.getLastRow();
@@ -77,7 +79,7 @@ function mbDatum(s) {
 // Vom Monteur (Service-Mappe, mit KEY): einen unterschriebenen Bericht ablegen
 function mbHoch(d) {
   const mail = clean(d.email, 150).toLowerCase(), name = clean(d.name, 100);
-  if (ADMIN_MAILS.indexOf(mail) < 0 && !mail.endsWith('@' + DOMAIN)) throw new Error('Nicht berechtigt.');
+  if (ADMIN_MAILS.indexOf(mail) < 0 && MB_TEST_MAILS.indexOf(mail) < 0 && !mail.endsWith('@' + DOMAIN)) throw new Error('Nicht berechtigt.');
   if (!name) throw new Error('Name fehlt.');
   if (!mbFreiFuer(mail)) return 'noch nicht freigegeben';
   const b64 = String(d.b64 || '').replace(/\s/g, '');
@@ -124,23 +126,23 @@ function mbNutzer(ss, d) {
   return { mail: mail, name: String(r[0] || '') };
 }
 
-// Berichte von Admin-Adressen sind Testberichte: Nur Admins sehen sie, alle anderen Nutzer nicht.
-function mbOhneTestberichte(zeilen, admins) {
-  return zeilen.filter(function (r) { return admins.indexOf(String(r[2]).toLowerCase()) < 0; });
+// Berichte vom Testkonto sind Testberichte. Das Testkonto sieht NUR Testberichte, alle anderen Nutzer sehen sie nicht.
+function mbSichtbar(zeilen, testMails, istTestkonto) {
+  return zeilen.filter(function (r) { return (testMails.indexOf(String(r[2]).toLowerCase()) >= 0) === istTestkonto; });
 }
 
-let MB_NUR_ECHTE = false; // pro Anfrage gesetzt (siehe montageberichteAnfrage)
+let MB_TESTKONTO = false; // pro Anfrage gesetzt (siehe montageberichteAnfrage)
 
 function mbZeilen() {
   const s = mbBlatt(), last = s.getLastRow();
   const z = last < 2 ? [] : s.getRange(2, 1, last - 1, MB_HEAD.length).getValues();
-  return MB_NUR_ECHTE ? mbOhneTestberichte(z, ADMIN_MAILS) : z;
+  return mbSichtbar(z, MB_TEST_MAILS, MB_TESTKONTO);
 }
 
 function montageberichteAnfrage(d) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const nutzer = mbNutzer(ss, d);
-  MB_NUR_ECHTE = ADMIN_MAILS.indexOf(nutzer.mail) < 0;
+  MB_TESTKONTO = MB_TEST_MAILS.indexOf(nutzer.mail) >= 0;
   const ev = String(d.event || '');
   if (/^mb_(vermerke|korrektur|klaerung|abzeichnen|unterschrift_datei)$/.test(ev)) {
     const schreiben = /^mb_(korrektur|klaerung|abzeichnen)$/.test(ev);
@@ -401,4 +403,4 @@ function mbVermerkAnfrage(ev, d, nutzer, ablage, jetzt) {
   return { ok: true, stand: stand() };
 }
 
-if (typeof module !== 'undefined') module.exports = { mbOhneTestberichte, mbUebersicht, mbKw, mbDatum, MB_BEREICHE, mbStand, mbVermerkPruefen, mbVermerkAnfrage, MB_HANDY_URL, mbSigCode, mbSigHandy, mbSigAbholen };
+if (typeof module !== 'undefined') module.exports = { mbSichtbar, mbUebersicht, mbKw, mbDatum, MB_BEREICHE, mbStand, mbVermerkPruefen, mbVermerkAnfrage, MB_HANDY_URL, mbSigCode, mbSigHandy, mbSigAbholen };
