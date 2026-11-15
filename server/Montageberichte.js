@@ -311,7 +311,7 @@ function mbVermerkAnfrage(ev, d, nutzer, ablage, jetzt) {
     return { ok: true, vermerke: vermerke };
   }
   if (ev === 'mb_unterschrift_datei') {
-    const id = txt(d.id, 100);
+    const id = txt(d.datei, 100);
     const bekannt = id && ablage.zeilen().some(function (z) { return z.ereignis === 'abzeichnung' && z.unterschriftId === id; });
     return bekannt ? { ok: true, b64: ablage.unterschriftLesen(id) } : { ok: false, error: 'Unterschrift nicht gefunden.' };
   }

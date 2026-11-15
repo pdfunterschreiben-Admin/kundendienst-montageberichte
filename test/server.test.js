@@ -155,8 +155,10 @@ test('Korrektur nach der Abzeichnung hebt sie auf, Abzeichnen bei offener Rückf
 test('mb_unterschrift_datei nur für bekannte IDs', () => {
   const ab = fakeAblage();
   const id = anfrage('mb_abzeichnen', { unterschrift: png }, berta, ab).stand.abzeichnung.unterschriftId;
-  assert.deepEqual(s.mbVermerkAnfrage('mb_unterschrift_datei', { id }, berta, ab, 1), { ok: true, b64: 'PNGDATA' });
-  assert.deepEqual(s.mbVermerkAnfrage('mb_unterschrift_datei', { id: 'FREMD' }, berta, ab, 1), { ok: false, error: 'Unterschrift nicht gefunden.' });
+  // Das Feld heißt datei (wie bei mb_datei): id ist in jeder Anfrage die Rechner-ID des Programms
+  assert.deepEqual(s.mbVermerkAnfrage('mb_unterschrift_datei', { datei: id, id: 'RECHNER' }, berta, ab, 1), { ok: true, b64: 'PNGDATA' });
+  assert.deepEqual(s.mbVermerkAnfrage('mb_unterschrift_datei', { datei: 'FREMD' }, berta, ab, 1), { ok: false, error: 'Unterschrift nicht gefunden.' });
+  assert.deepEqual(s.mbVermerkAnfrage('mb_unterschrift_datei', { id }, berta, ab, 1), { ok: false, error: 'Unterschrift nicht gefunden.' });
 });
 
 test('unbekanntes Ereignis', () => {
