@@ -20,7 +20,7 @@ wer will, zieht sie später selbst nach).
 ```
 ersetzen durch
 ```
-/^mb_(monteure|liste|datei|vermerke|korrektur|klaerung|abzeichnen|unterschrift_datei|unterschrift_code|unterschrift_abholen)$/
+/^mb_(monteure|liste|datei|vermerke|korrektur|klaerung|abzeichnen|unterschrift_datei|unterschrift_code|unterschrift_abholen|uebersicht)$/
 ```
 
 **b) Anfragen der Handy-Seite durchlassen.** In `doPost` die Zeile

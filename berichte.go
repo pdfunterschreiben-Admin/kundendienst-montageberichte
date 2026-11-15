@@ -43,7 +43,7 @@ func (a *app) handleMb(w http.ResponseWriter, r *http.Request) {
 	switch in.Event {
 	case "mb_monteure", "mb_liste", "mb_datei",
 		"mb_vermerke", "mb_korrektur", "mb_klaerung", "mb_abzeichnen",
-		"mb_unterschrift_datei", "mb_unterschrift_code", "mb_unterschrift_abholen":
+		"mb_unterschrift_datei", "mb_unterschrift_code", "mb_unterschrift_abholen", "mb_uebersicht":
 	default:
 		writeJSON(w, map[string]any{"ok": false, "error": "Unbekannte Anfrage."})
 		return
@@ -86,14 +86,6 @@ func (a *app) handleMb(w http.ResponseWriter, r *http.Request) {
 }
 
 // Ablage: Dokumente\Kundendienst Montageberichte\<Monteur>\<Jahr> KW <nn>\<Auftrag>.pdf
-func ablageOrdner() string {
-	home, _ := os.UserHomeDir()
-	if p := os.Getenv("USERPROFILE"); p != "" {
-		home = p
-	}
-	return filepath.Join(home, "Documents", "Kundendienst Montageberichte")
-}
-
 var unerlaubt = regexp.MustCompile(`[\\/:*?"<>|\x00-\x1f]+`)
 
 func sauber(s string) string {
