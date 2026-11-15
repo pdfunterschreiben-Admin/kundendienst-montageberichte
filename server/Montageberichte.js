@@ -119,6 +119,10 @@ function montageberichteAnfrage(d) {
     finally { if (sperre) sperre.releaseLock(); }
   }
   const tz = Session.getScriptTimeZone() || 'Europe/Berlin';
+  if (ev === 'mb_unterschrift_code')
+    return mbSigCode(nutzer, CacheService.getScriptCache(), function () { return Utilities.getUuid().replace(/-/g, '').slice(0, 24); },
+      MB_HANDY_URL, function (link) { return qrBmpBase64(link, 6); });
+  if (ev === 'mb_unterschrift_abholen') return mbSigAbholen(d.token, nutzer, CacheService.getScriptCache());
   if (ev === 'mb_monteure') {
     // je Monteur (E-Mail) der neueste Name und alle Kalenderwochen mit Anzahl Berichten
     const m = {};
@@ -243,6 +247,56 @@ function mbAblage(ss) {
   return ablage;
 }
 
+// ---------------- Unterschrift per Handy (QR-Code) ----------------
+// Vorbild: „Typenschild per Handy“ der Service-Mappe. Die Handy-Seite liegt auf GitHub Pages (docs/handy in diesem Repository)
+// und schickt das Foto per doPost (Ereignis h_sig, ohne Anmeldung, nur mit gültigem Code). Das Foto liegt nur im Skript-Cache.
+const MB_HANDY_URL = 'https://pdfunterschreiben-admin.github.io/kundendienst-montageberichte/handy/';
+const MB_SIG_TTL = 600;      // Sekunden, die der Code gilt
+const MB_SIG_MAX = 90000;    // Zeichen Base64 für das Foto (Cache-Werte dürfen höchstens 100 KB groß sein)
+
+function mbSigToken(token) {
+  const t = String(token == null ? '' : token).replace(/[^a-f0-9]/g, '');
+  return /^[a-f0-9]{24}$/.test(t) ? t : '';
+}
+
+function mbSigCode(nutzer, cache, zufall, handyUrl, qr) {
+  const token = zufall();
+  cache.put('sig_' + token, JSON.stringify({ mail: nutzer.mail, b64: null }), MB_SIG_TTL);
+  const link = handyUrl + '?sig=' + token;
+  return { ok: true, token: token, link: link, qr: qr(link) };
+}
+
+// Von der Handy-Seite: '1'/'0' bei aktion 'pruefen', '1' bei 'hochladen'; Fehler als Error (doPost macht daraus „FEHLER“)
+function mbSigHandy(d, cache) {
+  const token = mbSigToken(d.token);
+  const roh = token ? cache.get('sig_' + token) : null;
+  const eintrag = roh ? JSON.parse(roh) : null;
+  if (d.aktion === 'pruefen') return eintrag && eintrag.b64 === null ? '1' : '0';
+  if (d.aktion !== 'hochladen') throw new Error('Unbekannte Anfrage.');
+  if (!eintrag) throw new Error('Der QR-Code ist abgelaufen. Bitte im Programm noch einmal „Unterschrift hinterlegen“ wählen.');
+  if (eintrag.b64 !== null) throw new Error('Für diesen QR-Code wurde schon ein Foto geschickt.');
+  const b64 = String(d.b64 || '').replace(/\s/g, '');
+  if (b64.length < 100 || (b64.indexOf('/9j/') !== 0 && b64.indexOf('iVBOR') !== 0)) throw new Error('Kein Foto.');
+  if (b64.length > MB_SIG_MAX) throw new Error('Foto zu groß.');
+  eintrag.b64 = b64;
+  cache.put('sig_' + token, JSON.stringify(eintrag), MB_SIG_TTL);
+  return '1';
+}
+
+// Vom Büro-Programm: Foto abholen (nur der Nutzer, dem der Code gehört); nach der Ausgabe ist es gelöscht
+function mbSigAbholen(token, nutzer, cache) {
+  const t = mbSigToken(token);
+  const roh = t ? cache.get('sig_' + t) : null;
+  const eintrag = roh ? JSON.parse(roh) : null;
+  if (!eintrag || eintrag.mail !== nutzer.mail) return { ok: false, error: 'Code ungültig oder abgelaufen.' };
+  if (eintrag.b64 === null) return { ok: true, wartet: true };
+  cache.remove('sig_' + t);
+  return { ok: true, b64: eintrag.b64 };
+}
+
+// Aus Code.gs aufrufbar (siehe docs/server-einspielen.md)
+function mbHandySig(d) { return mbSigHandy(d, CacheService.getScriptCache()); }
+
 // Anfragen des Büro-Programms zu Vermerken. ablage: {zeilen(), anhaengen(zeile), unterschriftSpeichern(mail, b64), unterschriftLesen(id)}
 function mbVermerkAnfrage(ev, d, nutzer, ablage, jetzt) {
   const txt = function (v, max) { return String(v == null ? '' : v).trim().slice(0, max); };
@@ -285,4 +339,4 @@ function mbVermerkAnfrage(ev, d, nutzer, ablage, jetzt) {
   return { ok: true, stand: stand() };
 }
 
-if (typeof module !== 'undefined') module.exports = { mbKw, mbDatum, MB_BEREICHE, mbStand, mbVermerkPruefen, mbVermerkAnfrage };
+if (typeof module !== 'undefined') module.exports = { mbKw, mbDatum, MB_BEREICHE, mbStand, mbVermerkPruefen, mbVermerkAnfrage, MB_HANDY_URL, mbSigCode, mbSigHandy, mbSigAbholen };
