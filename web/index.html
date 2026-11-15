@@ -185,18 +185,82 @@ td .chip{white-space:nowrap}
 .chip.uvv{background:var(--ok-soft);color:var(--ok)}
 .chip.dguv{background:var(--warn-soft);color:var(--warn)}
 .chip .ser{font:11.5px var(--f-mono);opacity:.75}
+
+/* ---------- Erscheinungsbild Büro-Programm ---------- */
+:root{--paper:#eef1f5;--sheet:#fff;--ink:#1a2433;--muted:#5d6878;--line:#d9dee6;--pen:#1f4fa8;--pen-soft:#e6edf9;--row:#f6f8fb;
+  --bar:#1b2a41;--bar-ink:#e8edf5;--bar-muted:#a9b6ca;--gelb:#f2b705}
+@media (prefers-color-scheme: dark){:root{--paper:#11161f;--sheet:#182030;--ink:#e4e9f1;--muted:#9aa6b8;--line:#2a3447;--pen:#8bb0ff;--pen-soft:#1d2b48;--row:#1c2537;--bar:#0b111b;--bar-ink:#e4e9f1;--bar-muted:#8d9ab0}}
+body{padding:0;font-size:14px;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+.ic{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+.appbar{flex:none;display:flex;align-items:center;justify-content:space-between;gap:16px;height:52px;padding:0 18px;background:var(--bar);color:var(--bar-ink);border-bottom:3px solid var(--gelb)}
+.marke{display:flex;align-items:center;gap:11px;min-width:0}
+.logo{width:22px;height:22px;border-radius:5px;background:var(--gelb);box-shadow:inset 0 -7px 0 rgba(0,0,0,.18)}
+.appbar h1{font:600 16px/1 var(--f-display);letter-spacing:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.appbar-r{display:flex;align-items:center;gap:6px;font-size:13px;min-width:0}
+.appbar .nutzer{margin:0 8px 0 0;display:flex;align-items:center;gap:10px;color:var(--bar-ink)}
+.appbar .nutzer .link{color:var(--bar-muted);text-decoration:none;font-size:13px}
+.appbar .nutzer .link:hover{color:#fff;text-decoration:underline}
+.appbar .ver{font:13px var(--f-body);color:var(--bar-muted);display:inline-flex;gap:8px;align-items:center;padding:0 8px;border-left:1px solid rgba(255,255,255,.14)}
+.appbar .ver .test{color:var(--bar);background:var(--gelb);font-weight:600;font-size:12px;padding:1px 7px;border-radius:4px}
+button.bar{background:transparent;border-color:transparent;color:var(--bar-ink);padding:6px 10px;font-size:13px}
+button.bar:hover{background:rgba(255,255,255,.1);border-color:transparent}
+.wrap{flex:1;min-height:0;max-width:none;margin:0;gap:0}
+.banner{border-radius:0;padding:10px 18px}
+.grid{flex:1;min-height:0;grid-template-columns:300px minmax(0,1fr);gap:0;align-items:stretch}
+aside{position:static;gap:0;background:var(--sheet);border-right:1px solid var(--line);overflow:auto}
+aside .panel{border:0;border-radius:0;border-bottom:1px solid var(--line);padding:16px 16px 18px;gap:10px}
+aside .panel:first-child{flex:1}
+.step h2{font:600 13.5px var(--f-body);color:var(--ink)}
+.step{align-items:center}
+.pfad{margin:0;font-size:12.5px;color:var(--ink);overflow-wrap:break-word;line-height:1.4}
+main{padding:18px;overflow:auto;gap:0}
+.doc{border-radius:8px}
+.doc-head{padding:14px 16px}
+.doc-name{font:600 16px var(--f-display)}
+th{text-transform:none;letter-spacing:0;font:600 12.5px var(--f-body);color:var(--muted);background:var(--row);padding:8px 14px}
+td{padding:10px 14px}
+td.nr{font:600 14px var(--f-body);font-variant-numeric:tabular-nums}
+.chip{border-radius:4px;font-size:12px;padding:2px 8px}
+.chip .ser{font:11.5px var(--f-body);font-variant-numeric:tabular-nums}
+button,.btn{border-radius:6px;font-size:13.5px;padding:7px 12px}
+td.akt button+button{margin-left:6px}
+.akt button{padding:5px 10px}
+.mont{font-weight:500;border-color:transparent;background:transparent;padding:7px 8px}
+.mont:hover{background:var(--row);border-color:transparent}
+.mont.auf{background:transparent;border-color:transparent;color:var(--ink);font-weight:600}
+.mont .n,.tabs .n{font:500 12px var(--f-body);font-variant-numeric:tabular-nums}
+.kws{border-left:1px solid var(--line);margin-left:14px;padding-left:8px;gap:2px}
+.kw{border-color:transparent;background:transparent;font-size:13.5px;padding:6px 10px;position:relative}
+.kw:hover{background:var(--row);border-color:transparent}
+.kw.gew{background:var(--pen-soft);color:var(--pen);border-color:transparent;font-weight:600}
+.kw.gew::before{content:"";position:absolute;left:-9px;top:4px;bottom:4px;width:3px;border-radius:2px;background:var(--gelb)}
+.kw.gew .hint{color:var(--pen);opacity:1}
+.empty{padding:64px 28px}
+dialog{border-radius:10px}
+.dlg-head{padding:12px 16px}
+textarea{font:14px/1.45 var(--f-body);padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:var(--paper);color:var(--ink);width:100%;resize:vertical}
+textarea:focus-visible{outline:2px solid var(--pen);outline-offset:2px}
+#pruefDlg .dlg-body{background:var(--sheet);gap:0!important;padding:0}
+#pruefDlg section{padding:16px 18px;border-bottom:1px solid var(--line)}
+#pruefDlg section:last-child{border-bottom:0}
+#pruefDlg section > strong{font:600 14px var(--f-body)}
+#pruefDlg section button{align-self:flex-start}
+#pruefDlg #paSenden{align-self:stretch;justify-content:center;padding:9px 12px}
+#pruefKorr > div{padding:8px 10px;border-radius:6px;background:var(--row);color:var(--ink);font-size:13px}
+@media (max-width:960px){body{height:auto;overflow:auto}.grid{grid-template-columns:minmax(0,1fr)}aside{border-right:0}.appbar{height:auto;flex-wrap:wrap;padding:10px 14px}}
 </style>
 </head>
 <body>
-<div class="wrap">
-  <div class="top">
-    <div>
-      <h1>Kundendienst Montageberichte</h1>
-      <p class="lead">Die unterschriebenen Berichte der Monteure aus der Service-Mappe – je Monteur und Kalenderwoche, zu einer PDF je Auftrag zusammengefügt: erst Montagebericht, dann UVV-Bericht, dann DGUV-V3-Bericht.</p>
-      <p class="hint" id="userLine" hidden></p>
-    </div>
-    <div class="ver"><span id="verText">Version …</span><button class="ghost" id="checkBtn" hidden>Nach Updates suchen</button><button id="helpBtn">Anleitung</button></div>
+<header class="appbar">
+  <div class="marke"><span class="logo" aria-hidden="true"></span><h1>Kundendienst Montageberichte</h1></div>
+  <div class="appbar-r">
+    <p class="nutzer" id="userLine" hidden></p>
+    <span class="ver" id="verText">Version …</span>
+    <button class="bar" id="checkBtn" hidden>Nach Updates suchen</button>
+    <button class="bar" id="helpBtn">Anleitung</button>
   </div>
+</header>
+<div class="wrap">
 
   <div class="banner" id="banner" hidden>
     <div><b id="bannerTitle"></b><div class="notes" id="bannerNotes"></div></div>
@@ -206,17 +270,17 @@ td .chip{white-space:nowrap}
   <div class="grid">
     <aside>
       <section class="panel" aria-labelledby="h-mont">
-        <div class="step"><b>01</b><h2 id="h-mont">Monteure</h2><button class="ghost" id="neuLaden" title="Neu laden" style="margin-left:auto">↻ Aktualisieren</button></div>
+        <div class="step"><h2 id="h-mont">Monteure</h2><button class="ghost" id="neuLaden" title="Liste neu laden" style="margin-left:auto"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9M13.5 2.5v3h-3"/></svg> Aktualisieren</button></div>
         <div id="monteure" class="col" style="gap:6px"></div>
         <p class="hint" id="monteureInfo">Wird geladen …</p>
       </section>
       <section class="panel" aria-labelledby="h-ablage">
-        <div class="step"><b>02</b><h2 id="h-ablage">Ablage</h2></div>
-        <p class="hint">Die fertigen PDFs liegen in<br><span class="val" id="ablagePfad">…</span></p>
-        <button type="button" id="ablageBtn">📂 Ordner öffnen</button>
+        <div class="step"><h2 id="h-ablage">Ablage</h2></div>
+        <p class="hint">Fertige PDFs liegen in</p><p class="pfad" id="ablagePfad">…</p>
+        <button type="button" id="ablageBtn"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 4.5v8a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-6a1 1 0 0 0-1-1H8L6.5 3.5h-4a1 1 0 0 0-1 1z"/></svg> Ordner öffnen</button>
       </section>
       <section class="panel" id="adminPanel" aria-labelledby="h-adm" hidden>
-        <div class="step"><b>ADMIN</b><h2 id="h-adm">Testkanal</h2></div>
+        <div class="step"><h2 id="h-adm">Testkanal</h2><span class="chip info">Admin</span></div>
         <label class="check"><input type="checkbox" id="testChannel"> Testversionen vor allen anderen bekommen</label>
         <p class="hint">Wer die Montageberichte sehen darf: <button class="link" id="openSheet">Google-Tabelle öffnen</button> → Blatt „Nutzer Montageberichte“, Spalte „Berechtigt (ja)“.</p>
       </section>
@@ -227,13 +291,13 @@ td .chip{white-space:nowrap}
         <div class="doc-head">
           <div class="col" style="gap:2px"><span class="doc-name" id="kwTitel">Bitte links einen Monteur und eine Kalenderwoche wählen</span><span class="hint" id="kwInfo"></span></div>
           <div class="row">
-            <button type="button" id="kwOrdner" hidden>📂 Ordner der KW</button>
-            <button type="button" id="kwNeu" hidden title="Alle PDFs dieser Woche neu zusammenstellen">↻ Neu erstellen</button>
+            <button type="button" id="kwOrdner" hidden><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 4.5v8a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-6a1 1 0 0 0-1-1H8L6.5 3.5h-4a1 1 0 0 0-1 1z"/></svg> Ordner der KW</button>
+            <button type="button" id="kwNeu" hidden title="Alle PDFs dieser Woche neu zusammenstellen"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9M13.5 2.5v3h-3"/></svg> Neu erstellen</button>
           </div>
         </div>
         <div id="tableBox" hidden>
           <table>
-            <thead><tr><th>Auftrag</th><th>Inhalt (in dieser Reihenfolge)</th><th>Datum</th><th>Ablage</th><th></th></tr></thead>
+            <thead><tr><th>Auftrag</th><th>Berichte in der PDF</th><th>Datum</th><th>Ablage</th><th></th></tr></thead>
             <tbody id="rows"></tbody>
           </table>
         </div>
@@ -337,7 +401,7 @@ td .chip{white-space:nowrap}
 
 <dialog id="pruefDlg">
   <div class="dlg">
-    <div class="dlg-head"><strong id="pruefTitel">Bericht prüfen</strong><span class="row" style="gap:8px"><button type="button" class="ghost" id="pruefExtern" title="Mit dem PDF-Programm von Windows öffnen">↗ Extern öffnen</button><button type="button" class="ghost" id="pruefZu">Schließen</button></span></div>
+    <div class="dlg-head"><strong id="pruefTitel">Bericht prüfen</strong><span class="row" style="gap:8px"><button type="button" class="ghost" id="pruefExtern" title="Mit dem PDF-Programm von Windows öffnen"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M9 2.5h4.5V7M13.5 2.5 7 9M11.5 9.5v4h-9v-9h4"/></svg> Extern öffnen</button><button type="button" class="ghost" id="pruefZu">Schließen</button></span></div>
     <div class="pruef-grid">
     <div class="pruef-pdfbox"><iframe id="pruefPdf" class="pruef-pdf" title="Bericht" hidden></iframe><div id="pruefPdfLeer" class="hint">PDF wird erstellt …</div></div>
     <div class="dlg-body col" style="gap:16px">
@@ -623,7 +687,7 @@ function renderWoche(){
     tr.innerHTML = `<td class="nr">${g.nr ? esc(g.nr) : '<span class="hint">ohne Nummer</span>'}</td>
       <td class="inhalt"><div class="liste">${g.berichte.map((b, i) => `<span class="chip ${b.art}">${i + 1}. ${esc(ART_NAME[b.art] || b.art)}${b.serie ? ` <span class="ser">${esc(b.serie)}</span>` : ""}</span>`).join("")}</div></td>
       <td class="ort">${esc(datumDe(g.datum))}</td><td><div class="liste">${status}${chips}</div></td>
-      <td class="akt"><button type="button" ${ok ? "" : "disabled"}>📄 Öffnen</button> <button type="button" class="pruefen">✎ Prüfen</button></td>`;
+      <td class="akt"><button type="button" ${ok ? "" : "disabled"}><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 1.5h5.5L13 5v9.5H4z"/><path d="M9.5 1.5V5H13"/></svg> Öffnen</button> <button type="button" class="pruefen primary"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5l3 3 7-7"/></svg> Prüfen</button></td>`;
     tr.querySelector("button").onclick = () => pruefenOeffnen(g);
     tr.querySelector(".pruefen").onclick = () => pruefenOeffnen(g);
     tb.appendChild(tr);
@@ -886,7 +950,7 @@ function renderAdmin(){
   $("#adminPanel").hidden = !isAdmin();
   $("#testChannel").checked = state.testChannel !== false;
   const v = $("#verText").dataset.v;
-  if(v) $("#verText").innerHTML = `Version ${esc(v)}` + (/-test/.test(v) ? ' <span class="chip warn">Testversion</span>' : "");
+  if(v) $("#verText").innerHTML = `Version ${esc(v)}` + (/-test/.test(v) ? ' <span class="test">Testversion</span>' : "");
 }
 $("#openSheet").onclick = () => fetch("/api/open?ziel=tabelle", {method: "POST"}).catch(() => {});
 $("#testChannel").onchange = e => { state.testChannel = e.target.checked; persist(); $("#banner").hidden = true; checkUpdates(true); };
@@ -895,7 +959,7 @@ function renderUser(){
   const el = $("#userLine");
   if(!state.user){ el.hidden = true; return; }
   el.hidden = false;
-  el.innerHTML = `Angemeldet als ${esc(state.user.name)} (${esc(state.user.email)}) · <button class="link" id="userChange">ändern</button> · <button class="link" id="userLogout">abmelden</button>`;
+  el.innerHTML = `<span title="${esc(state.user.email)}">${esc(state.user.name)}</span><button class="link" id="userChange">Ändern</button><button class="link" id="userLogout">Abmelden</button>`;
   $("#userChange").onclick = openRegistration;
   $("#userLogout").onclick = () => $("#logoutDlg").showModal();
 }
