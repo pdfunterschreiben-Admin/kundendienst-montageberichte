@@ -14,7 +14,7 @@ const MB_HEAD = ['Eingang', 'Monteur', 'E-Mail', 'Berichtsdatum', 'Jahr', 'KW', 
 const MB_NUTZER = 'Nutzer Montageberichte';
 const MB_ARTEN = { montage: 'Montagebericht', uvv: 'UVV Bericht', dguv: 'DGUV V3 Bericht' };
 // Wer Berichte an den Kundendienst schicken darf (Schaltfläche „An Kundendienst senden“ in der Service-Mappe):
-// Admins immer, sonst wer im Blatt „Nutzer“ in der Spalte „An Kundendienst senden (ja)“ ein „ja“ hat.
+// Admins, solange dort nicht „nein“ steht; sonst wer im Blatt „Nutzer“ in der Spalte „An Kundendienst senden (ja)“ ein „ja“ hat.
 // Notfalls hier E-Mails eintragen, '*' = alle Monteure.
 const MB_FREI = [];
 // Testkonto: Berichte mit dieser Adresse als Monteur sind Testberichte und nur für diese Adresse sichtbar.
@@ -32,13 +32,17 @@ function mbFreiSpalte(users) {
 function mbFreiFuer(mail, users) {
   mail = String(mail || '').toLowerCase();
   if (!mail) return false;
-  if (ADMIN_MAILS.indexOf(mail) >= 0 || MB_TEST_MAILS.indexOf(mail) >= 0 || MB_FREI.indexOf('*') >= 0 || MB_FREI.indexOf(mail) >= 0) return true;
+  // Admins: an, solange in der Spalte nicht „nein“ steht (in der Admin-App ausschaltbar); alle anderen: nur mit „ja“
+  const admin = ADMIN_MAILS.indexOf(mail) >= 0;
+  if (!admin && (MB_TEST_MAILS.indexOf(mail) >= 0 || MB_FREI.indexOf('*') >= 0 || MB_FREI.indexOf(mail) >= 0)) return true;
   users = users || SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Nutzer');
-  if (!users) return false;
+  if (!users) return admin;
   const c = mbFreiSpalte(users), lr = users.getLastRow();
-  if (lr < 2) return false;
+  if (lr < 2) return admin;
   const mails = users.getRange(2, 2, lr - 1, 1).getValues(), frei = users.getRange(2, c, lr - 1, 1).getValues();
-  return mails.some(function (m, i) { return String(m[0]).trim().toLowerCase() === mail && String(frei[i][0]).trim().toLowerCase() === 'ja'; });
+  const werte = [];
+  mails.forEach(function (m, i) { if (String(m[0]).trim().toLowerCase() === mail) werte.push(String(frei[i][0]).trim().toLowerCase()); });
+  return admin ? werte.indexOf('nein') < 0 : werte.indexOf('ja') >= 0;
 }
 
 function mbBlatt(ss) {
