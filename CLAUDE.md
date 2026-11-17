@@ -15,6 +15,8 @@ Go-Windows-Programm mit Web-Oberfläche (`web/`). Releases über GitHub Actions 
 
 ## Server-Teil
 - `server/Montageberichte.js` läuft im Apps-Script-Projekt „PDF Unterschreiben Anmeldung“ (Konto pdfunterschreiben@gmail.com).
+- **Nie die ganze Live-Datei im Apps-Script-Projekt ersetzen** – nur den Montageberichte-Abschnitt gezielt austauschen.
+  Die Live-Datei enthält auch Service-Mappe, Kundendienstfahrzeug usw. (Regeln: CLAUDE.md im Repository pdfunterschreiben-Admin/pdfunterschreiben).
 - Ein Push bringt Server-Änderungen **nicht** auf den Server: Die Datei muss von Hand ins Apps-Script-Projekt
   kopiert werden (ohne die letzte `module.exports`-Zeile). Bei jeder Änderung daran darauf hinweisen.
 - Der Server nimmt Berichte vorerst nur von Admins an: `MB_FREI` ist leer.
