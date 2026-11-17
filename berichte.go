@@ -80,6 +80,9 @@ func (a *app) handleMb(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, map[string]any{"ok": false, "offline": true, "error": "Keine gültige Antwort vom Server."})
 		return
 	}
+	if in.Event == "mb_datei" {
+		b = mbDateiEntschluesseln(b)
+	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
 	w.Write(b)

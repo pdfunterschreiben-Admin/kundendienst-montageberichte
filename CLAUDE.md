@@ -19,3 +19,11 @@ Go-Windows-Programm mit Web-Oberfläche (`web/`). Releases über GitHub Actions 
   kopiert werden (ohne die letzte `module.exports`-Zeile). Bei jeder Änderung daran darauf hinweisen.
 - Der Server nimmt Berichte vorerst nur von Admins an: `MB_FREI` ist leer.
   Freigabe später per einzelner E-Mail-Adresse in `MB_FREI` oder `'*'` für alle – nur auf ausdrücklichen Wunsch.
+
+## Verschlüsselte Berichte
+- Die Service-Mappe (ab 1.20.58) verschlüsselt jeden Bericht mit dem öffentlichen Schlüssel des Büros („SMB1“-Format,
+  siehe `schluessel.go`). Der geheime Schlüssel liegt mit dem Schlüssel-Passwort verschlüsselt auf dem Server
+  (Script Properties `mb_pub`, `mb_priv`, `mb_fp`) und lokal in `%APPDATA%\Kundendienst Montageberichte\montageberichte-schluessel.pem`.
+- `mb_datei` wird in `handleMb` entschlüsselt; die Oberfläche bekommt die PDF wie bisher. Unverschlüsselte Berichte gehen unverändert durch.
+- Format nicht ändern, ohne die Service-Mappe (`mbkrypto.go` dort) mitzuziehen.
+

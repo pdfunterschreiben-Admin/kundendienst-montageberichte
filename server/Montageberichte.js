@@ -89,9 +89,13 @@ function mbHoch(d) {
   const b64 = String(d.b64 || '').replace(/\s/g, '');
   if (b64.length < 200 || b64.length > 40000000) throw new Error('Keine gültige PDF.');
   const bytes = Utilities.base64Decode(b64);
-  if (String.fromCharCode.apply(null, bytes.slice(0, 4).map(function (b) { return b & 255; })) !== '%PDF') throw new Error('Keine PDF-Datei.');
-  const sha = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, bytes)
+  const anfang = String.fromCharCode.apply(null, bytes.slice(0, 4).map(function (b) { return b & 255; }));
+  // Verschlüsselt (Service-Mappe ab 1.20.58): „SMB1“, die Prüfsumme der unverschlüsselten PDF schickt das Programm mit
+  const verschl = anfang === 'SMB1';
+  if (!verschl && anfang !== '%PDF') throw new Error('Keine PDF-Datei.');
+  const sha = verschl ? String(d.sha || '').toLowerCase() : Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, bytes)
     .map(function (b) { return ('0' + (b & 255).toString(16)).slice(-2); }).join('');
+  if (!/^[0-9a-f]{64}$/.test(sha)) throw new Error('Prüfsumme fehlt.');
   const s = mbBlatt();
   const art = MB_ARTEN[d.art] ? d.art : 'montage';
   const datum = mbDatum(d.datum), w = mbKw(datum);
@@ -105,7 +109,7 @@ function mbHoch(d) {
     // derselbe Bericht noch einmal unterschrieben (gleicher Monteur, Dateiname, Auftrag, Art): ersetzen
     if (!zeile && String(v[i][2]).toLowerCase() === mail && String(v[i][9]) === datei && String(v[i][6]) === nr && String(v[i][7]) === art) zeile = i + 2;
   }
-  const f = mbOrdner(name).createFile(Utilities.newBlob(bytes, 'application/pdf', datei));
+  const f = mbOrdner(name).createFile(Utilities.newBlob(bytes, verschl ? 'application/octet-stream' : 'application/pdf', verschl ? datei + '.verschluesselt' : datei));
   const neu = [new Date(), name, mail, datum, w.jahr, w.kw, "'" + nr, art, "'" + ser, datei, f.getId(), sha];
   if (zeile) {
     try { DriveApp.getFileById(String(v[zeile - 2][10])).setTrashed(true); } catch (x) { }
@@ -115,6 +119,16 @@ function mbHoch(d) {
   s.appendRow(neu);
   return 'gespeichert';
 }
+
+// ---- Schlüssel für verschlüsselte Berichte ----
+// Öffentlicher Schlüssel (zum Verschlüsseln, für die Service-Mappe) und der mit dem Schlüssel-Passwort
+// verschlüsselte geheime Schlüssel (nur das Büro-Programm kann ihn mit dem Passwort öffnen).
+function mbSchluessel() {
+  const p = PropertiesService.getScriptProperties();
+  return { pub: p.getProperty('mb_pub') || '', priv: p.getProperty('mb_priv') || '', fp: p.getProperty('mb_fp') || '' };
+}
+// Service-Mappe (mit KEY): öffentlichen Schlüssel holen – leer = noch keiner, dann wird unverschlüsselt geschickt
+function mbPubText() { return mbSchluessel().pub; }
 
 // Büro-Programm: angemeldeter und berechtigter Rechner?
 function mbNutzer(ss, d) {
@@ -148,6 +162,17 @@ function montageberichteAnfrage(d) {
   const nutzer = mbNutzer(ss, d);
   MB_TESTKONTO = MB_TEST_MAILS.indexOf(nutzer.mail) >= 0;
   const ev = String(d.event || '');
+  if (ev === 'mb_schluessel_holen') { const k = mbSchluessel(); return { ok: true, pub: k.pub, priv: k.priv, fp: k.fp }; }
+  if (ev === 'mb_schluessel_setzen') {
+    if (ADMIN_MAILS.indexOf(nutzer.mail) < 0) return { ok: false, error: 'Nur der Admin kann den Schlüssel erzeugen.' };
+    const p = PropertiesService.getScriptProperties();
+    if (p.getProperty('mb_pub')) return { ok: false, error: 'Es gibt schon einen Schlüssel. Bitte „Schlüssel einrichten“ mit dem Passwort nehmen.' };
+    const pub = String(d.pub || ''), priv = String(d.priv || ''), fp = String(d.fp || '').replace(/[^0-9A-F]/g, '').slice(0, 16);
+    if (!/^-----BEGIN PUBLIC KEY-----[\s\S]+-----END PUBLIC KEY-----\s*$/.test(pub) || pub.length > 2000) return { ok: false, error: 'Ungültiger Schlüssel.' };
+    if (!/^[A-Za-z0-9+\/=]{200,8000}$/.test(priv)) return { ok: false, error: 'Ungültiger Schlüssel.' };
+    p.setProperties({ mb_pub: pub, mb_priv: priv, mb_fp: fp });
+    return { ok: true, fp: fp };
+  }
   if (/^mb_(vermerke|korrektur|klaerung|abzeichnen|unterschrift_datei)$/.test(ev)) {
     const schreiben = /^mb_(korrektur|klaerung|abzeichnen)$/.test(ev);
     const sperre = schreiben ? LockService.getScriptLock() : null;

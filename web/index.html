@@ -342,6 +342,7 @@ button.burger .ic{width:20px;height:20px}
         <details class="m-teil m-fach"><summary>Meine Unterschrift <span class="hint" id="sigStatus"></span></summary><div class="crop-prev" id="sigAnzeige" style="width:100%"><span class="hint">Noch keine hinterlegt</span></div>
         <div class="row"><button type="button" id="sigAendern">Ändern</button><button type="button" class="ghost danger" id="sigLoeschen2" hidden>Löschen</button></div>
         <p class="hint">Gilt für neue Abzeichnungen. Schon abgezeichnete Aufträge behalten ihre Unterschrift.</p></details>
+        <details class="m-teil m-fach"><summary>Verschlüsselung <span class="hint" id="keyStatus"></span></summary><p class="hint" id="keyText">Wird geprüft …</p><div class="row"><button type="button" id="keyEinrichten" hidden>Schlüssel einrichten …</button><button type="button" id="keyErzeugen" hidden>Schlüssel erzeugen …</button></div></details>
         <details class="m-teil m-fach" id="adminPanel" hidden><summary>Testkanal <span class="chip info">Admin</span></summary><label class="check"><input type="checkbox" id="testChannel"> Testversionen vor allen anderen bekommen</label>
         <p class="hint">Jemanden sperren: <button class="link" id="openSheet">Google-Tabelle öffnen</button> → Blatt „Nutzer Montageberichte“, Spalte „Gesperrt (ja)“.</p></details>
       </div>
@@ -560,6 +561,19 @@ button.burger .ic{width:20px;height:20px}
     </div>
     </div>
   </div>
+</dialog>
+
+<dialog id="keyDlg">
+  <form method="dialog" class="dlg" id="keyForm">
+    <div class="dlg-head"><strong id="keyTitel">Schlüssel einrichten</strong><button class="ghost" value="x" formnovalidate>Schließen</button></div>
+    <div class="dlg-body col" style="gap:10px">
+      <span class="hint" id="keyInfo"></span>
+      <label class="col" style="gap:4px">Schlüssel-Passwort<input type="password" id="keyPw" autocomplete="off" required></label>
+      <label class="col" style="gap:4px" id="keyPw2Box" hidden>Passwort wiederholen<input type="password" id="keyPw2" autocomplete="off"></label>
+      <p class="err" id="keyErr" hidden></p>
+    </div>
+    <div class="dlg-foot"><span></span><button type="submit" class="primary" id="keyOk">Einrichten</button></div>
+  </form>
 </dialog>
 
 <dialog id="blockDlg">
@@ -936,7 +950,10 @@ async function kwOeffnen(m, k, scroll = true){
 async function pdfHolen(id){
   if(mb.cache.has(id)) return mb.cache.get(id);
   const r = await mbCall("mb_datei", {datei: id});
-  if(!r.ok) throw new Error(r.error || "Bericht konnte nicht geladen werden.");
+  if(!r.ok){
+    if(r.schluessel && !$("#keyDlg").open) keyDialog("einrichten", r.error + " Bitte einmal das Schlüssel-Passwort eingeben (vom Admin).");
+    throw new Error(r.error || "Bericht konnte nicht geladen werden.");
+  }
   const bin = atob(r.b64), u = new Uint8Array(bin.length);
   for(let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
   if(mb.cache.size > 200) mb.cache.clear();
@@ -1072,7 +1089,7 @@ $("#regMail").addEventListener("input", () => {
 });
 const regErr = m => { $("#regErr").textContent = m; $("#regErr").hidden = !m; };
 const codeErr = m => { $("#codeErr").textContent = m; $("#codeErr").hidden = !m; };
-function angemeldetWechsel(){ mb.monteure = []; mb.wahl = null; renderMonteure(); monteureLaden(); }
+function angemeldetWechsel(){ mb.monteure = []; mb.wahl = null; renderMonteure(); monteureLaden(); keyPruefen(); }
 $("#regForm").addEventListener("submit", async e => {
   e.preventDefault();
   const name = $("#regName").value.trim().replace(/\s+/g, " ");
@@ -1273,6 +1290,52 @@ $("#blockRetry").onclick = async () => {
   if(r.ok && !r.blocked){ state.blocked = false; persist(); $("#blockDlg").close(); toast("Zugang ist wieder freigegeben."); monteureLaden(); }
   else toast(r.ok ? "Der Zugang ist weiterhin gesperrt." : (r.error || "Keine Verbindung."));
 };
+/* ---------- Verschlüsselung der Berichte ----------
+   Die Service-Mappe verschlüsselt die Berichte mit dem öffentlichen Schlüssel des Büros. Öffnen kann sie nur ein
+   Rechner, auf dem der geheime Schlüssel eingerichtet ist (einmal mit dem Schlüssel-Passwort). */
+let keyStand = null, keyModus = "einrichten";
+async function keyPruefen(){
+  try{ keyStand = await (await fetch("/api/schluessel")).json(); }catch(e){ keyStand = null; }
+  const k = keyStand || {};
+  $("#keyEinrichten").hidden = !(k.server && !k.lokal);
+  $("#keyErzeugen").hidden = !(isAdmin() && k.ok && k.server === false && !k.serverFehler);
+  $("#keyStatus").textContent = k.lokal ? "✓ eingerichtet" : k.server ? "fehlt" : "";
+  $("#keyText").textContent = !k.ok ? "Konnte nicht geprüft werden." :
+    k.lokal ? `Dieser Rechner kann verschlüsselte Berichte öffnen (Schlüssel ${k.fp}).` + (k.serverFp && k.serverFp !== k.fp ? " Achtung: Auf dem Server liegt ein anderer Schlüssel – bitte neu einrichten." : "") :
+    k.server ? "Die Monteure schicken ihre Berichte verschlüsselt. Damit dieser Rechner sie öffnen kann, einmal das Schlüssel-Passwort eingeben." :
+    k.serverFehler ? k.serverFehler :
+    isAdmin() ? "Noch kein Schlüssel. Erzeuge ihn einmal – danach schickt die Service-Mappe alle Berichte verschlüsselt." : "Noch nicht eingerichtet (macht der Admin).";
+  if(k.lokal && k.serverFp && k.serverFp !== k.fp) $("#keyEinrichten").hidden = false;
+  return k;
+}
+function keyDialog(modus, grund){
+  keyModus = modus;
+  $("#keyTitel").textContent = modus === "erzeugen" ? "Schlüssel erzeugen" : "Schlüssel einrichten";
+  $("#keyInfo").textContent = grund || (modus === "erzeugen"
+    ? "Das Passwort brauchen alle Büro-Rechner einmal zum Einrichten. Gut aufheben (mindestens 10 Zeichen)! Ohne Passwort lassen sich die verschlüsselten Berichte auf dem Server nicht mehr öffnen – die schon abgelegten PDFs bleiben lesbar."
+    : "Die Berichte der Monteure kommen verschlüsselt an. Gib einmal das Schlüssel-Passwort ein (vom Admin) – danach kann dieser Rechner sie öffnen.");
+  $("#keyPw2Box").hidden = modus !== "erzeugen";
+  $("#keyOk").textContent = modus === "erzeugen" ? "Erzeugen" : "Einrichten";
+  $("#keyPw").value = $("#keyPw2").value = ""; $("#keyErr").hidden = true;
+  $("#keyDlg").showModal(); $("#keyPw").focus();
+}
+$("#keyEinrichten").onclick = () => keyDialog("einrichten");
+$("#keyErzeugen").onclick = () => keyDialog("erzeugen");
+$("#keyForm").onsubmit = async e => {
+  if(e.submitter && e.submitter.value === "x") return;
+  e.preventDefault();
+  const pw = $("#keyPw").value, err = m => { $("#keyErr").textContent = m; $("#keyErr").hidden = !m; };
+  if(keyModus === "erzeugen" && pw !== $("#keyPw2").value) return err("Die Passwörter sind nicht gleich.");
+  $("#keyOk").disabled = true; err(keyModus === "erzeugen" ? "Schlüssel wird erzeugt …" : "Wird geprüft …");
+  try{
+    const r = await (await fetch("/api/schluessel", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({aktion: keyModus, passwort: pw})})).json();
+    if(!r.ok) return err(r.error || "Hat nicht geklappt.");
+    $("#keyDlg").close(); toast(keyModus === "erzeugen" ? `Schlüssel erzeugt (${r.fp}). Ab jetzt schickt die Service-Mappe die Berichte verschlüsselt.` : "Schlüssel eingerichtet – verschlüsselte Berichte lassen sich jetzt öffnen.", 8000);
+    mb.cache.clear(); await keyPruefen();
+    if(mb.wahl) kwOeffnen(mb.wahl.m, mb.wahl.k, false);
+  }catch(x){ err("Keine Verbindung zum Programm."); }
+  finally{ $("#keyOk").disabled = false; }
+};
 function renderAdmin(){
   $("#adminPanel").hidden = !isAdmin();
   $("#testChannel").checked = state.testChannel !== false;
@@ -1334,7 +1397,7 @@ async function refreshBlock(event){
     $("#ablagePfad").textContent = i.ablage || "";
     reportOn = !!i.report; renderAdmin();
     await checkAccess();
-    if(!locked()) monteureLaden();
+    if(!locked()){ monteureLaden(); keyPruefen(); }
     if(i.updates){ $("#checkBtn").hidden = false; checkUpdates(false); }
   }catch(e){}
 })();
