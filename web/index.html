@@ -402,7 +402,14 @@ button.burger .ic{width:20px;height:20px}
     <div class="dlg-head"><strong>Anleitung</strong><button class="ghost" value="x">Schließen</button></div>
     <div class="dlg-body help">
       <h3>Woher kommen die Berichte?</h3>
-      <p>Der Monteur klickt in der Service-Mappe bei „Berichte unterschreiben“ auf „An Kundendienst senden“ – dann landen seine unterschriebenen Berichte hier. Freigegeben wird das je Monteur in der Google-Tabelle, Blatt „Nutzer“, Spalte „An Kundendienst senden (ja)“. Die Kalenderwoche richtet sich nach dem Datum im Bericht.</p>
+      <p>Der Monteur klickt in der Service-Mappe bei „Berichte unterschreiben“ auf „An Kundendienst senden“ – dann landen seine unterschriebenen Berichte hier. Die Kalenderwoche richtet sich nach dem Datum im Bericht.</p>
+      <p>Die Schaltfläche hat nur, wer dafür freigegeben ist: in der <b>Admin-App</b> unter „Nutzer“ den Monteur aufklappen und „An Kundendienst senden“ einschalten (oder in der Google-Tabelle, Blatt „Nutzer“, Spalte „An Kundendienst senden (ja)“).</p>
+      <h3>Verschlüsselung – einmal pro Rechner einrichten</h3>
+      <ul>
+        <li>Die Berichte kommen <b>verschlüsselt</b> an. Auf dem Server (Google) liegt nur unlesbarer Inhalt – öffnen kann sie nur dieses Programm.</li>
+        <li><b>Jeder Büro-Rechner</b> braucht dafür einmal das <b>Schlüssel-Passwort</b>: Menü ☰ → „Verschlüsselung“ → „Schlüssel einrichten …“. Das Passwort gibt der Admin. Fragt das Programm beim Öffnen eines Berichts danach, ist das derselbe Schritt.</li>
+        <li><b>Admin, nur ganz am Anfang:</b> Menü ☰ → „Verschlüsselung“ → „Schlüssel erzeugen …“ und ein Passwort mit mindestens 10 Zeichen vergeben. Erst danach schickt die Service-Mappe verschlüsselt. <b>Das Passwort gut aufheben</b> – ohne es lassen sich die verschlüsselten Berichte auf dem Server nicht mehr öffnen (die schon abgelegten PDFs bleiben lesbar).</li>
+      </ul>
       <h3>Was ist zu tun? – „Zu prüfen“</h3>
       <ul>
         <li>Oben links steht <b>Zu prüfen</b> mit der Zahl aller Aufträge, die noch nicht abgezeichnet sind – von allen Monteuren, die ältesten zuerst. Einfach von oben nach unten abarbeiten.</li>
@@ -429,9 +436,10 @@ button.burger .ic{width:20px;height:20px}
       <ul>
         <li>Jede PDF wird automatisch gespeichert unter <b>&lt;Ablageordner&gt;\&lt;Monteur&gt;\&lt;Jahr&gt; KW &lt;Nummer&gt;\&lt;Auftragsnummer&gt;.pdf</b>. Der Ablageordner ist frei wählbar: Menü ☰ → „Ablage“ → „Ändern …“ (Standard: Dokumente\Kundendienst Montageberichte).</li>
         <li><b>Fertige Berichte fürs Büro:</b> Ist dafür ein Ordner gewählt (Menü ☰), wird jeder abgezeichnete Auftrag zusätzlich dorthin kopiert – als &lt;Auftragsnummer&gt;.pdf. Dort wird nie überschrieben: eine neue Fassung heißt „&lt;Nr&gt; (2).pdf“.</li>
+        <li>Auf dem Server werden die Berichte nach <b>12 Monaten</b> automatisch gelöscht. Die PDFs in der Ablage und im Ordner für fertige Berichte bleiben.</li>
       </ul>
       <h3>Menü ☰ oben rechts</h3>
-      <p>Anmeldung ändern oder abmelden, Version und Updates, diese Anleitung, Ablage, Ordner für fertige Berichte und Unterschrift.</p>
+      <p>Anmeldung ändern oder abmelden, Version und Updates, diese Anleitung, Ablage, Ordner für fertige Berichte, Unterschrift und Verschlüsselung.</p>
     </div>
   </form>
 </dialog>

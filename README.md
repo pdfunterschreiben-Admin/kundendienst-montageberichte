@@ -45,3 +45,9 @@ Für Korrekturen und Unterschrift sind einmalig Handarbeit-Schritte nötig: sieh
 ## Versionen
 `TESTVERSION` höher als `VERSION` → Testversion im Vorab-Release `montageberichte-adminkanal`.
 `VERSION` neu → `montageberichte-vX.Y.Z` und `montageberichte-stabil`.
+
+## Verschlüsselung
+Die Service-Mappe (ab 1.20.58) verschlüsselt jeden Bericht mit dem öffentlichen Schlüssel des Büros. Einmalig erzeugt der
+Admin im Programm den Schlüssel (Menü ☰ → Verschlüsselung → Schlüssel erzeugen, Passwort ≥ 10 Zeichen); jeder weitere
+Büro-Rechner richtet ihn einmal mit diesem Passwort ein. Auf dem Server werden Berichte nach 12 Monaten gelöscht.
+
