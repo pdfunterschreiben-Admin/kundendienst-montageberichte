@@ -157,8 +157,32 @@ function mbZeilen() {
   return mbSichtbar(z, MB_TEST_MAILS, MB_TESTKONTO);
 }
 
+// ---- Löschfrist ----
+// Einmal am Tag: Berichte, die vor mehr als MB_AUFBEWAHREN_MONATE eingegangen sind, im Drive endgültig löschen und
+// aus dem Blatt nehmen. Die fertigen PDFs im Büro (Ablage) sind davon nicht betroffen.
+const MB_AUFBEWAHREN_MONATE = 12;
+function mbAufraeumen(jetzt) {
+  const p = PropertiesService.getScriptProperties();
+  const heute = String(jetzt.getFullYear()) + '-' + (jetzt.getMonth() + 1) + '-' + jetzt.getDate();
+  if (p.getProperty('mb_aufgeraeumt') === heute) return 0;
+  p.setProperty('mb_aufgeraeumt', heute);
+  const grenze = new Date(jetzt.getTime()); grenze.setMonth(grenze.getMonth() - MB_AUFBEWAHREN_MONATE);
+  const s = mbBlatt(), last = s.getLastRow();
+  if (last < 2) return 0;
+  const v = s.getRange(2, 1, last - 1, MB_HEAD.length).getValues();
+  let n = 0;
+  for (let i = v.length - 1; i >= 0; i--) {
+    const t = v[i][0] instanceof Date ? v[i][0] : new Date(v[i][0]);
+    if (isNaN(t) || t >= grenze) continue;
+    try { if (typeof driveLoeschen === 'function') driveLoeschen(String(v[i][10])); else DriveApp.getFileById(String(v[i][10])).setTrashed(true); } catch (x) { }
+    s.deleteRow(i + 2); n++;
+  }
+  return n;
+}
+
 function montageberichteAnfrage(d) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
+  try { mbAufraeumen(new Date()); } catch (x) { }
   const nutzer = mbNutzer(ss, d);
   MB_TESTKONTO = MB_TEST_MAILS.indexOf(nutzer.mail) >= 0;
   const ev = String(d.event || '');
@@ -432,4 +456,4 @@ function mbVermerkAnfrage(ev, d, nutzer, ablage, jetzt) {
   return { ok: true, stand: stand() };
 }
 
-if (typeof module !== 'undefined') module.exports = { mbSichtbar, mbUebersicht, mbKw, mbDatum, MB_BEREICHE, mbStand, mbVermerkPruefen, mbVermerkAnfrage, MB_HANDY_URL, mbSigCode, mbSigHandy, mbSigAbholen };
+if (typeof module !== 'undefined') module.exports = { mbAufraeumen, mbSichtbar, mbUebersicht, mbKw, mbDatum, MB_BEREICHE, mbStand, mbVermerkPruefen, mbVermerkAnfrage, MB_HANDY_URL, mbSigCode, mbSigHandy, mbSigAbholen };

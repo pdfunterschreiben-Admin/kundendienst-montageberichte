@@ -16,10 +16,10 @@ function umgebung() {
       computeDigest: (_a, bytes) => Array.from(crypto.createHash('sha256').update(Buffer.from(bytes.map(b => b & 255))).digest()).map(x => (x > 127 ? x - 256 : x)),
       DigestAlgorithm: { SHA_256: 1 }, newBlob: (b, mime, name) => ({ b, mime, name }),
     },
-    PropertiesService: { getScriptProperties: () => ({ getProperty: k => props[k] || null, setProperties: o => Object.assign(props, o) }) },
+    PropertiesService: { getScriptProperties: () => ({ getProperty: k => props[k] || null, setProperty: (k, v) => { props[k] = v; }, setProperties: o => Object.assign(props, o) }) },
     DriveApp: { getRootFolder: () => ({ getFoldersByName: () => ({ hasNext: () => false }), createFolder: () => ({ getFoldersByName: () => ({ hasNext: () => false }), createFolder: () => ({ createFile: blob => { dateien.push(blob); return { getId: () => 'F' + dateien.length }; } }) }) }) },
     SpreadsheetApp: { getActiveSpreadsheet: () => ({}) },
-    sheet: () => ({ getLastColumn: () => 13, getLastRow: () => 1 + zeilen.length, getRange: () => ({ getValues: () => zeilen.map(z => z.slice()), setValues: v => zeilen.splice(0, zeilen.length, ...v) }), appendRow: r => zeilen.push(r) }),
+    sheet: () => ({ getLastColumn: () => 13, getLastRow: () => 1 + zeilen.length, getRange: () => ({ getValues: () => zeilen.map(z => z.slice()), setValues: v => zeilen.splice(0, zeilen.length, ...v) }), appendRow: r => zeilen.push(r), deleteRow: r => zeilen.splice(r - 2, 1) }),
     Session: { getScriptTimeZone: () => 'Europe/Berlin' },
     LockService: { getScriptLock: () => ({ waitLock() {}, releaseLock() {} }) },
     module: { exports: {} }, console,
@@ -62,4 +62,17 @@ test('mbHoch: unverschlüsselte PDF (ältere Service-Mappe) geht weiter', () => 
   assert.equal(ctx.mbHoch({ email: 'monteur@firma.de', name: 'Max', b64: pdf, nr: '1', art: 'uvv', datei: 'a.pdf', datum: '' }), 'gespeichert');
   assert.equal(dateien[0].mime, 'application/pdf');
   assert.throws(() => ctx.mbHoch({ email: 'monteur@firma.de', name: 'Max', b64: Buffer.from('X'.repeat(300)).toString('base64'), datei: 'b.pdf' }), /Keine PDF/);
+});
+
+test('Löschfrist: Berichte älter als 12 Monate werden gelöscht, einmal am Tag', () => {
+  const { ctx, zeilen } = umgebung();
+  const geloescht = [];
+  ctx.driveLoeschen = id => geloescht.push(id);
+  const jetzt = new Date(2026, 10, 17);
+  const zeile = (datum, id) => [datum, 'Max', 'm@firma.de', datum, 2025, 1, "'1", 'montage', "'", 'a.pdf', id, 'x'];
+  zeilen.push(zeile(new Date(2025, 9, 1), 'ALT1'), zeile(new Date(2026, 5, 1), 'NEU'), zeile(new Date(2025, 10, 10), 'ALT2'));
+  assert.equal(ctx.mbAufraeumen(jetzt), 2);
+  assert.deepEqual(geloescht.sort(), ['ALT1', 'ALT2']);
+  assert.equal(zeilen.length, 1); assert.equal(zeilen[0][10], 'NEU');
+  assert.equal(ctx.mbAufraeumen(jetzt), 0, 'am selben Tag nicht nochmal');
 });
